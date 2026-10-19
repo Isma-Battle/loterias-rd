@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loterías RD · El Oráculo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --noche: #06060c;
+    --noche-2: #0c0e1d;
+    --panel: rgba(255, 255, 255, .035);
+    --panel-2: rgba(255, 255, 255, .06);
+    --panel-solido: #11131f;
+    --borde: rgba(243, 207, 118, .13);
+    --borde-fuerte: rgba(243, 207, 118, .38);
+    --oro: #f3cf76;
+    --oro-2: #c9973a;
+    --oro-3: #8a6420;
+    --marfil: #f4efe3;
+    --tenue: #a7a3b8;
+    --muy-tenue: #6f6b80;
+    --esmeralda: #38e2a0;
+    --esmeralda-2: #0f9d68;
+    --violeta: #8b6cff;
+    --rubi: #ff7a8a;
+    --display: "Cinzel", "Trajan Pro", Georgia, serif;
+    --texto: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--noche); }
+  body {
+    margin: 0; min-height: 100vh; color: var(--marfil);
+    font: 15px/1.5 var(--texto);
+    background:
+      radial-gradient(1100px 600px at 12% -10%, rgba(139, 108, 255, .16), transparent 60%),
+      radial-gradient(900px 520px at 95% 0%, rgba(243, 207, 118, .11), transparent 60%),
+      radial-gradient(800px 600px at 50% 110%, rgba(56, 226, 160, .05), transparent 60%),
+      linear-gradient(180deg, var(--noche-2), var(--noche) 70%);
+    background-attachment: fixed;
+  }
+  /* Cielo estrellado */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .55;
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+      radial-gradient(1px 1px at 140px 80px, rgba(255,255,255,.8), transparent),
+      radial-gradient(1.5px 1.5px at 260px 160px, rgba(243,207,118,.9), transparent),
+      radial-gradient(1px 1px at 330px 40px, rgba(255,255,255,.7), transparent),
+      radial-gradient(1px 1px at 90px 220px, rgba(255,255,255,.6), transparent),
+      radial-gradient(1.2px 1.2px at 200px 290px, #fff, transparent);
+    background-size: 380px 340px;
+    animation: titilar 6s ease-in-out infinite alternate;
+  }
+  @keyframes titilar { from { opacity: .35; } to { opacity: .65; } }
+  header, main, footer { position: relative; z-index: 1; }
+
+  a { color: inherit; }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(8, 8, 16, .72); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--borde);
+  }
+  .barra {
+    max-width: 1240px; margin: 0 auto; padding: 12px 20px;
+    display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+  }
+  .marca { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .marca .emblema {
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 32% 28%, #fff8dc, var(--oro) 35%, var(--oro-2) 65%, var(--oro-3));
+    color: #2b1c03; font-size: 15px; box-shadow: 0 0 18px rgba(243, 207, 118, .4);
+  }
+  .marca h1 {
+    margin: 0; font: 700 18px/1 var(--display); letter-spacing: .14em;
+    background: linear-gradient(180deg, #fff3cf, var(--oro) 55%, var(--oro-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .info { color: var(--tenue); font-size: 12.5px; min-width: 0; }
+  nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+  nav a, button {
+    font: 500 14px/1 var(--texto); color: var(--marfil); background: transparent;
+    text-decoration: none; border: 1px solid var(--borde); border-radius: 999px;
+    padding: 9px 16px; cursor: pointer; transition: background .2s, border-color .2s, color .2s;
+  }
+  nav a:hover, button:hover { border-color: var(--borde-fuerte); background: var(--panel-2); }
+  nav a.activo {
+    color: #2b1c03; border-color: transparent; font-weight: 600;
+    background: linear-gradient(180deg, #fbe3a2, var(--oro) 45%, var(--oro-2));
+    box-shadow: 0 0 22px rgba(243, 207, 118, .25);
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  #actualizar { border-color: var(--borde-fuerte); }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 22px 20px 40px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--borde); border-radius: 20px; padding: 20px;
+    backdrop-filter: blur(6px);
+  }
+  .titulo {
+    font: 600 13px/1 var(--display); letter-spacing: .22em; text-transform: uppercase;
+    color: var(--oro); margin: 34px 0 14px; display: flex; align-items: center; gap: 12px;
+  }
+  .titulo::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--borde-fuerte), transparent); }
+  .titulo small { font: 400 12px var(--texto); letter-spacing: 0; text-transform: none; color: var(--tenue); }
+  .nota { font-size: 13px; color: var(--tenue); line-height: 1.6; }
+  .aviso { padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; border: 1px solid var(--borde-fuerte); background: var(--panel); }
+  .aviso.error { color: var(--rubi); border-color: var(--rubi); }
+  .vacio { text-align: center; padding: 56px 16px; color: var(--tenue); }
+  .vacio code { background: var(--panel-2); color: var(--oro); padding: 3px 8px; border-radius: 8px; }
+  input, select {
+    font: inherit; color: var(--marfil); background: rgba(255,255,255,.05); color-scheme: dark;
+    border: 1px solid var(--borde); border-radius: 999px; padding: 8px 14px;
+  }
+  select option, select optgroup { background: var(--panel-solido); }
+
+  /* ---------------------------------------------------------------- esferas */
+  .bolas { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bola {
+    min-width: 34px; height: 34px; padding: 0 7px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-weight: 700; font-variant-numeric: tabular-nums; color: var(--marfil);
+    background:
+      radial-gradient(circle at 32% 26%, rgba(255,255,255,.28), rgba(255,255,255,.05) 42%, rgba(0,0,0,.35) 100%),
+      #1b1e30;
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: inset 0 -3px 6px rgba(0,0,0,.35);
+  }
+  .bola.oro, .bola.primero {
+    color: #2b1c03; border-color: rgba(255, 240, 200, .5);
+    background: radial-gradient(circle at 32% 24%, #fffaf0 0%, #f8dc8e 20%, #dcaa4a 55%, #8a6420 100%);
+    box-shadow: 0 0 18px rgba(243, 207, 118, .32), inset 0 -4px 8px rgba(90, 60, 10, .45);
+  }
+  .bola.acierto {
+    color: #03241a; border-color: rgba(200, 255, 230, .6);
+    background: radial-gradient(circle at 32% 24%, #eafff6 0%, #7ff0c4 22%, #2fcf8f 55%, #0b6b47 100%);
+    box-shadow: 0 0 22px rgba(56, 226, 160, .55), inset 0 -4px 8px rgba(0, 60, 40, .45);
+  }
+  .bola.fallo { filter: grayscale(.85) brightness(.7); opacity: .55; box-shadow: none; }
+  .bola.chica { min-width: 26px; height: 26px; font-size: 12px; padding: 0 5px; }
+  .grande .bola { min-width: 52px; height: 52px; font-size: 20px; }
+
+  .orbe { display: flex; flex-direction: column; align-items: center; gap: 6px; animation: aparecer .6s both; animation-delay: calc(var(--i, 0) * 70ms); }
+  .orbe-anillo { position: relative; display: grid; place-items: center; }
+  .orbe-anillo svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .orbe-anillo .pista { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 3; }
+  .orbe-anillo .arco { fill: none; stroke: var(--oro); stroke-width: 3.5; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(243,207,118,.6)); }
+  .orbe-anillo .arco.acierto { stroke: var(--esmeralda); filter: drop-shadow(0 0 4px rgba(56,226,160,.7)); }
+  .orbe-anillo .arco.fallo { stroke: var(--muy-tenue); filter: none; }
+  .orbe small { font-size: 11px; color: var(--tenue); letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+  @keyframes aparecer { from { opacity: 0; transform: translateY(8px) scale(.85); } to { opacity: 1; transform: none; } }
+
+  /* ------------------------------------------------------------------ héroe */
+  .heroe {
+    position: relative; overflow: hidden; border-radius: 28px; padding: 32px;
+    border: 1px solid var(--borde-fuerte);
+    background:
+      radial-gradient(600px 300px at 85% 40%, rgba(243, 207, 118, .14), transparent 70%),
+      radial-gradient(500px 300px at 0% 0%, rgba(139, 108, 255, .18), transparent 70%),
+      linear-gradient(160deg, rgba(25, 22, 48, .92), rgba(10, 10, 20, .92));
+    box-shadow: 0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 32px; align-items: center;
+  }
+  .heroe .eyebrow { font: 600 12px var(--display); letter-spacing: .3em; color: var(--oro); text-transform: uppercase; }
+  .heroe h2 {
+    margin: 10px 0 6px; font: 700 clamp(34px, 5.4vw, 60px)/1.02 var(--display); letter-spacing: .04em;
+    background: linear-gradient(180deg, #fff6da 10%, var(--oro) 55%, var(--oro-2) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 40px rgba(243, 207, 118, .15);
+  }
+  .heroe .sub { color: var(--tenue); font-size: 15px; }
+  .heroe .sub::first-letter { text-transform: uppercase; }
+  .nav-fecha { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+  .nav-fecha button { padding: 9px 14px; }
+  .cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+  .cifra { border: 1px solid var(--borde); background: rgba(255,255,255,.03); border-radius: 16px; padding: 14px; }
+  .cifra b { display: block; font: 700 26px/1.1 var(--display); color: var(--marfil); font-variant-numeric: tabular-nums; }
+  .cifra b small { font: 500 14px var(--texto); color: var(--tenue); }
+  .cifra span { font-size: 12px; color: var(--tenue); }
+  .cifra.oro b { color: var(--oro); }
+
+  .vision { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; }
+  .vision .etiqueta { font: 600 11px var(--display); letter-spacing: .32em; color: var(--tenue); text-transform: uppercase; }
+  .altar { position: relative; width: 210px; height: 210px; display: grid; place-items: center; }
+  .halo {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 0 10%, rgba(243,207,118,.75) 22%, transparent 36%,
+                transparent 50%, rgba(139,108,255,.6) 64%, transparent 80%);
+    filter: blur(10px); animation: girar 9s linear infinite;
+  }
+  .halo.dos { inset: 18px; animation-duration: 14s; animation-direction: reverse; opacity: .7; }
+  .altar::after {
+    content: ""; position: absolute; inset: 8px; border-radius: 50%;
+    border: 1px dashed rgba(243, 207, 118, .28); animation: girar 40s linear infinite;
+  }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  .altar .bola {
+    position: relative; width: 136px; height: 136px; font: 700 56px/1 var(--display);
+    box-shadow: 0 0 60px rgba(243, 207, 118, .45), inset 0 -10px 20px rgba(90, 60, 10, .5);
+    animation: latir 3.2s ease-in-out infinite;
+  }
+  .altar .bola.acierto { box-shadow: 0 0 70px rgba(56, 226, 160, .6), inset 0 -10px 20px rgba(0, 60, 40, .5); }
+  @keyframes latir { 50% { transform: scale(1.035); } }
+  .vision .lot { font: 600 20px var(--display); letter-spacing: .03em; }
+  .vision .lot a { text-decoration: none; }
+  .vision .lot a:hover { color: var(--oro); }
+  .fuerza-grande { display: flex; gap: 10px; align-items: center; color: var(--tenue); font-size: 13px; }
+  .fuerza-grande b { color: var(--oro); font: 700 18px var(--display); }
+  .respaldo { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .sello { font-size: 11.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--borde); color: var(--tenue); background: rgba(255,255,255,.03); }
+  .sello.oro { color: var(--oro); border-color: var(--borde-fuerte); }
+  .sello.acierto { color: var(--esmeralda); border-color: rgba(56, 226, 160, .45); background: rgba(56, 226, 160, .08); }
+
+  /* ------------------------------------------------------- jugadas maestras */
+  .maestras { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 14px; }
+  .maestra {
+    position: relative; text-decoration: none; text-align: center;
+    border: 1px solid var(--borde); border-radius: 20px; padding: 20px 14px 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    transition: transform .25s, border-color .25s, box-shadow .25s;
+  }
+  .maestra:hover { transform: translateY(-3px); border-color: var(--borde-fuerte); box-shadow: 0 16px 40px rgba(0,0,0,.4), 0 0 30px rgba(243,207,118,.08); }
+  .romano { position: absolute; top: 12px; left: 14px; font: 600 13px var(--display); color: var(--oro-2); letter-spacing: .08em; }
+  .maestra .lot { font-weight: 600; font-size: 14px; line-height: 1.25; }
+  .maestra .grupo { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muy-tenue); }
+
+  /* --------------------------------------------------------------- filtros */
+  .filtros { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+  .filtros .chip-btn { padding: 7px 14px; font-size: 13px; }
+  .filtros .chip-btn.activo { color: #2b1c03; border-color: transparent; background: linear-gradient(180deg, #fbe3a2, var(--oro) 45%, var(--oro-2)); }
+  .filtros label { font-size: 13px; color: var(--tenue); display: inline-flex; gap: 8px; align-items: center; margin-left: 6px; cursor: pointer; }
+  .filtros input[type=checkbox] { accent-color: var(--oro); width: 16px; height: 16px; }
+  .buscar { margin-left: auto; min-width: 220px; }
+
+  /* ------------------------------------------------------ tarjetas lotería */
+  .grupo-sec { margin-bottom: 26px; }
+  .grupo-sec > h3 { font: 600 12px var(--display); letter-spacing: .26em; text-transform: uppercase; color: var(--tenue); margin: 0 0 12px; }
+  .recs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .rec {
+    border: 1px solid var(--borde); border-radius: 22px; padding: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+    display: flex; flex-direction: column; gap: 16px; transition: border-color .25s, box-shadow .25s;
+  }
+  .rec:hover { border-color: var(--borde-fuerte); box-shadow: 0 0 30px rgba(243,207,118,.06); }
+  .rec.gano { border-color: rgba(56, 226, 160, .4); box-shadow: 0 0 34px rgba(56, 226, 160, .08); }
+  .rec-cab { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+  .rec-cab .nombre { font-weight: 650; font-size: 16px; text-decoration: none; }
+  .rec-cab .nombre:hover { color: var(--oro); }
+  .rec-cab .grupo { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muy-tenue); margin-top: 2px; }
+  .rec-orbes { display: flex; justify-content: space-around; gap: 8px; padding: 4px 0; }
+  .rec-pie { font-size: 12.5px; color: var(--tenue); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--borde); padding-top: 12px; }
+  .rec-pie .bolas { gap: 4px; }
+  details.senales summary { cursor: pointer; font-size: 12.5px; color: var(--oro-2); list-style: none; user-select: none; }
+  details.senales summary::-webkit-details-marker { display: none; }
+  details.senales summary::before { content: "✦ "; }
+  details.senales[open] summary { color: var(--oro); }
+  .lista-senales { display: grid; gap: 8px; margin-top: 12px; }
+  .senal { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; color: var(--tenue); }
+  .senal .bolas { gap: 4px; justify-content: flex-end; }
+
+  /* ---------------------------------------------- historial y consejo */
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 16px; align-items: start; }
+  .kpis { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 14px; }
+  .kpi b { display: block; font: 700 24px/1.1 var(--display); color: var(--oro); font-variant-numeric: tabular-nums; }
+  .kpi span { font-size: 12px; color: var(--tenue); }
+  .grafico { width: 100%; height: auto; display: block; }
+  .grafico text { fill: var(--muy-tenue); font: 11px var(--texto); }
+  .leyenda-g { display: flex; gap: 16px; font-size: 12px; color: var(--tenue); margin-top: 6px; flex-wrap: wrap; }
+  .leyenda-g i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+  .consejo { display: grid; gap: 4px; }
+  .consejero { display: grid; grid-template-columns: 30px minmax(0, 1fr) 120px 48px; gap: 12px; align-items: center; padding: 10px 6px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .consejero:last-child { border-bottom: 0; }
+  .consejero .pos { font: 600 13px var(--display); color: var(--oro-2); text-align: center; }
+  .consejero .n { font-weight: 600; font-size: 14px; }
+  .consejero .d { font-size: 12px; color: var(--muy-tenue); line-height: 1.4; }
+  .peso { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,.07); }
+  .peso span { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: linear-gradient(90deg, var(--oro-3), var(--oro)); box-shadow: 0 0 10px rgba(243,207,118,.4); }
+  .peso::after { content: ""; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--tenue); opacity: .6; }
+  .consejero .v { font: 700 14px var(--display); color: var(--marfil); text-align: right; font-variant-numeric: tabular-nums; }
+
+  footer { max-width: 1240px; margin: 0 auto; padding: 0 20px 40px; }
+  footer p { font-size: 12.5px; color: var(--muy-tenue); text-align: center; line-height: 1.7; margin: 0; }
+
+  /* ------------------------------------------- vistas de resultados */
+  .controles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .controles h2 { font: 600 20px var(--display); margin: 0 8px; letter-spacing: .03em; }
+  .controles h2::first-letter { text-transform: uppercase; }
+  .grupo { margin-bottom: 24px; }
+  .grupo > h3 { font: 600 12px var(--display); letter-spacing: .26em; text-transform: uppercase; color: var(--tenue); margin: 0 0 12px; }
+  .tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .tarjeta {
+    border: 1px solid var(--borde); border-radius: 18px; padding: 14px; cursor: pointer; text-align: left;
+    color: inherit; font: inherit; background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+    transition: border-color .2s;
+  }
+  .tarjeta:hover { border-color: var(--borde-fuerte); }
+  .tarjeta .nombre { font-weight: 600; margin-bottom: 10px; }
+  .detalle { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+  .detalle h3 { font: 600 15px var(--display); margin: 0 0 14px; letter-spacing: .03em; }
+  .lateral { display: grid; gap: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 8px 4px; border-top: 1px solid var(--borde); vertical-align: middle; }
+  td.fecha { white-space: nowrap; color: var(--tenue); width: 1%; padding-right: 18px; font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; }
+  .chip small { color: var(--tenue); }
+
+  @media (max-width: 900px) {
+    .heroe { grid-template-columns: 1fr; padding: 24px; }
+    .dos-col, .detalle { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .barra { padding: 10px 16px; gap: 10px; }
+    .barra .info { flex-basis: 100%; order: 3; }
+    nav { margin-left: 0; }
+    nav a, button { padding: 8px 12px; font-size: 13px; }
+    main { padding: 16px; }
+    .cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .buscar { margin-left: 0; width: 100%; }
+    .recs { grid-template-columns: 1fr; }
+    .consejero { grid-template-columns: 24px minmax(0, 1fr) 70px 40px; gap: 8px; }
+    .consejero .d { display: none; }
+    .altar { width: 180px; height: 180px; }
+    .altar .bola { width: 116px; height: 116px; font-size: 46px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="barra">
+    <a class="marca" href="#oraculo"><span class="emblema">✦</span><h1>LOTERÍAS RD</h1></a>
+    <span class="info" id="info"></span>
+    <nav>
+      <a href="#oraculo" id="tab-oraculo">El Oráculo</a>
+      <a href="#dia" id="tab-dia">Resultados</a>
+      <a href="#loteria" id="tab-loteria">Por lotería</a>
+    </nav>
+    <button id="actualizar" title="Descargar los resultados que falten hasta hoy">Actualizar</button>
+  </div>
+</header>
+<main>
+  <div id="aviso"></div>
+  <div id="vista"></div>
+</main>
+<footer>
+  <p>El Oráculo combina las reglas y aprende cuáles vienen acertando, pero los sorteos son aleatorios:
+    ningún sistema garantiza premios. Sus aciertos reales frente al azar están siempre a la vista. Juega con responsabilidad.</p>
+</footer>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+let resumen = null;
+let busqueda = "";
+const filtros = { grupo: "", buscar: "", pendientes: false };
+let datosOraculo = null;
+
+async function api(ruta, opciones) {
+  const r = await fetch(ruta, opciones);
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(datos.error || `Error ${r.status}`);
+  return datos;
+}
+
+function aviso(texto, error = false) {
+  $("#aviso").innerHTML = texto ? `<div class="aviso${error ? " error" : ""}">${esc(texto)}</div>` : "";
+}
+
+function aFecha(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+const fechaLarga = (iso) => aFecha(iso).toLocaleDateString("es-DO",
+  { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const fechaCorta = (iso) => aFecha(iso).toLocaleDateString("es-DO",
+  { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+const fechaMini = (iso) => aFecha(iso).toLocaleDateString("es-DO", { day: "numeric", month: "short" });
+const diasEntre = (a, b) => Math.round((aFecha(b) - aFecha(a)) / 86400000);
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+const ROMANOS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+  "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+const enlaceLoteria = (nombre) => `#loteria/${encodeURIComponent(nombre)}`;
+
+// En quinielas (3 números de 2 cifras) se resalta el primer premio
+function bolas(numeros, clase = "") {
+  const quiniela = numeros.length === 3 && numeros.every((n) => n.length === 2);
+  return `<div class="bolas">${numeros.map((n, i) =>
+    `<span class="bola ${clase}${quiniela && i === 0 && !clase ? " primero" : ""}">${esc(n)}</span>`).join("")}</div>`;
+}
+
+function sinDatos() {
+  return `<div class="vacio panel">
+    <p>Todavía no hay resultados guardados.</p>
+    <p>Pulsa <b>Actualizar</b> para bajar los de hoy, o descarga el historial completo desde la terminal:</p>
+    <p><code>python main.py historial --desde 2026-04-01</code></p>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- navegación
+// #oraculo/2026-10-18   #dia/2026-10-17   #loteria/Quiniela%20Leidsa
+
+function ir(hash) { location.hash = hash; }
+
+async function mostrar() {
+  const [vistaHash, ...resto] = location.hash.slice(1).split("/");
+  const vista = ["dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
+  const param = decodeURIComponent(resto.join("/"));
+  for (const v of ["oraculo", "dia", "loteria"])
+    $(`#tab-${v}`).classList.toggle("activo", v === vista);
+  try {
+    if (!resumen) await cargarResumen();
+    if (!resumen.total) { $("#vista").innerHTML = sinDatos(); return; }
+    if (vista === "loteria") await vistaLoteria(param);
+    else if (vista === "dia") await vistaDia(param || resumen.hasta);
+    else await vistaOraculo(param);
+  } catch (e) {
+    aviso(`No se pudieron cargar los datos: ${e.message}. ¿Está corriendo "python main.py web"?`, true);
+  }
+}
+
+async function cargarResumen() {
+  resumen = await api("/api/resumen");
+  $("#actualizar").hidden = resumen.publico;  // en la nube se actualiza sola
+  $("#info").textContent = resumen.total
+    ? `${resumen.total.toLocaleString("es-DO")} sorteos · ${fechaMini(resumen.desde)} – ${fechaMini(resumen.hasta)}`
+    : "Sin datos";
+}
+
+// ------------------------------------------------------------ el Oráculo
+
+function claseJugada(x) {
+  if (x.acierto === true) return "acierto";
+  if (x.acierto === false) return "fallo";
+  return "oro";
+}
+
+// Fuerza relativa: la jugada más respaldada del día vale 100
+let fuerzaMax = 1;
+const fuerza = (x) => Math.round(100 * x.fuerza / fuerzaMax);
+
+function orbe(x, tam, i = 0) {
+  const caja = tam + 16;
+  const pct = Math.max(4, fuerza(x));
+  const tip = `${x.numero} · fuerza ${fuerza(x)} · respaldo ${(x.fuerza * 100).toFixed(0)} % del peso de las reglas\n${x.reglas.join(", ")}`;
+  return `<div class="orbe" style="--i:${i}" title="${esc(tip)}">
+    <div class="orbe-anillo" style="width:${caja}px;height:${caja}px">
+      <svg viewBox="0 0 100 100"><circle class="pista" cx="50" cy="50" r="47"/>
+        <circle class="arco ${claseJugada(x)}" cx="50" cy="50" r="47" pathLength="100" stroke-dasharray="${pct} 100"/></svg>
+      <span class="bola ${claseJugada(x)}" style="width:${tam}px;height:${tam}px;font-size:${Math.round(tam * .4)}px">${esc(x.numero)}</span>
+    </div>
+    <small>${x.acierto === true ? "¡SALIÓ!" : `fuerza ${fuerza(x)}`}</small>
+  </div>`;
+}
+
+function tituloDia(d) {
+  const dif = diasEntre(d.hoy, d.fecha);
+  if (dif === 0) return "Las visiones de hoy";
+  if (dif === 1) return "Las visiones de mañana";
+  if (dif === -1) return "Las visiones de ayer";
+  return "Visiones de otro día";
+}
+
+function vision(x) {
+  if (!x) return `<div class="vision"><span class="etiqueta">La visión principal</span>
+    <p class="nota">No hay jugadas para este día.</p></div>`;
+  const estado = x.acierto === true ? `<span class="sello acierto">✓ Salió</span>`
+    : x.acierto === false ? `<span class="sello">No salió</span>` : `<span class="sello oro">Sorteo pendiente</span>`;
+  return `<div class="vision">
+    <span class="etiqueta">La visión principal</span>
+    <div class="altar"><div class="halo"></div><div class="halo dos"></div>
+      <span class="bola ${claseJugada(x)}">${esc(x.numero)}</span></div>
+    <div class="lot"><a href="${enlaceLoteria(x.loteria)}">${esc(x.loteria)}</a></div>
+    <div class="fuerza-grande">Fuerza <b>${fuerza(x)}</b> · ${plural(x.reglas.length, "regla", "reglas")} a favor ${estado}</div>
+    <div class="respaldo">${x.reglas.map((r) => `<span class="sello">${esc(r)}</span>`).join("")}</div>
+  </div>`;
+}
+
+function grafico(serie) {
+  if (serie.length < 2) return `<p class="nota">Aún no hay suficientes días para dibujar el historial.</p>`;
+  let a = 0, e = 0;
+  const puntos = serie.map((s) => ({ f: s.fecha, a: (a += s.aciertos), e: (e += s.esperado) }));
+  const W = 640, H = 220, M = { l: 36, r: 12, t: 12, b: 26 };
+  const max = Math.max(a, e) * 1.06;
+  const x = (i) => M.l + (i / (puntos.length - 1)) * (W - M.l - M.r);
+  const y = (v) => H - M.b - (v / max) * (H - M.t - M.b);
+  const linea = (k) => puntos.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
+  const area = `${linea("a")}L${x(puntos.length - 1)},${y(0)}L${x(0)},${y(0)}Z`;
+  const marcas = [0, .5, 1].map((t) => Math.round(max * t / 1.06));
+  return `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Aciertos acumulados del Oráculo frente al azar">
+    <defs><linearGradient id="g-oro" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3cf76" stop-opacity=".35"/><stop offset="1" stop-color="#f3cf76" stop-opacity="0"/></linearGradient></defs>
+    ${marcas.map((m) => `<line x1="${M.l}" x2="${W - M.r}" y1="${y(m)}" y2="${y(m)}" stroke="rgba(255,255,255,.06)"/>
+      <text x="${M.l - 8}" y="${y(m) + 4}" text-anchor="end">${m}</text>`).join("")}
+    <path d="${area}" fill="url(#g-oro)"/>
+    <path d="${linea("e")}" fill="none" stroke="#a7a3b8" stroke-width="1.6" stroke-dasharray="5 5"/>
+    <path d="${linea("a")}" fill="none" stroke="#f3cf76" stroke-width="2.6" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px rgba(243,207,118,.5))"/>
+    <circle cx="${x(puntos.length - 1)}" cy="${y(a)}" r="4.5" fill="#f3cf76"/>
+    <text x="${M.l}" y="${H - 6}">${esc(fechaMini(puntos[0].f))}</text>
+    <text x="${W - M.r}" y="${H - 6}" text-anchor="end">${esc(fechaMini(puntos.at(-1).f))}</text>
+  </svg>
+  <div class="leyenda-g"><span><i style="background:#f3cf76"></i>Aciertos del Oráculo (acumulados)</span>
+    <span><i style="background:repeating-linear-gradient(90deg,#a7a3b8 0 5px,transparent 5px 9px)"></i>Lo que daría el azar</span></div>`;
+}
+
+function historialOraculo(d) {
+  const o = d.oraculo;
+  const veredicto = Math.abs(o.z) < 2
+    ? "Va a la par del azar: la diferencia cabe dentro de la suerte normal."
+    : o.z >= 2 ? "Va por encima del azar. Hay que ver si lo mantiene con datos nuevos."
+    : "Va por debajo del azar.";
+  return `<div class="panel">
+    <div class="kpis">
+      <div class="kpi"><b>${o.aciertos}</b><span>aciertos en ${d.dias_prueba} días</span></div>
+      <div class="kpi"><b>${o.esperado.toFixed(0)}</b><span>daría el azar</span></div>
+      <div class="kpi"><b>${o.vs_azar.toFixed(2)}x</b><span>frente al azar</span></div>
+      <div class="kpi"><b>${o.con_acierto}</b><span>de ${o.jugadas} sorteos con premio</span></div>
+    </div>
+    ${grafico(o.serie)}
+    <p class="nota">${veredicto} (Z = ${o.z.toFixed(1)}; entre −2 y +2 es suerte normal.)</p>
+  </div>`;
+}
+
+function consejo(d) {
+  return `<div class="panel consejo">${d.reglas.map((r, i) => `
+    <div class="consejero" title="${esc(`${r.nombre}: ${r.aciertos} aciertos de ${r.numeros} números (${r.vs_azar.toFixed(2)}x el azar)`)}">
+      <span class="pos">${ROMANOS[i] ?? i + 1}</span>
+      <div><div class="n">${esc(r.nombre)}</div><div class="d">${esc(r.descripcion)}</div></div>
+      <div class="peso"><span style="width:${Math.min(100, r.peso * 50)}%"></span></div>
+      <span class="v">${r.peso.toFixed(2)}</span>
+    </div>`).join("")}
+    <p class="nota" style="margin:10px 6px 0">El peso es el voto de cada regla: 1.00 (la raya) es acertar como el azar.
+      Sube cuando la regla acierta y baja cuando falla; cada día lo antiguo cuenta un poco menos.</p>
+  </div>`;
+}
+
+async function vistaOraculo(fecha) {
+  const d = await api(`/api/recomendaciones${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  datosOraculo = d;
+  fuerzaMax = Math.max(0.0001, ...d.grupos.flatMap((g) => g.loterias.flatMap((l) => l.oraculo.map((x) => x.fuerza))));
+  const r = d.resumen;
+  const [principal, ...resto] = d.destacados;
+
+  $("#vista").innerHTML = `
+    <section class="heroe">
+      <div>
+        <div class="eyebrow">✦ ${esc(tituloDia(d))}</div>
+        <h2>El Oráculo</h2>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · escucha a ${d.total_reglas} reglas y elige 3 números por lotería</div>
+        <div class="nav-fecha">
+          <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
+          <input type="date" id="fecha" value="${esc(d.fecha)}">
+          <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
+          ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
+        </div>
+        <div class="cifras">
+          <div class="cifra"><b>${r.loterias}</b><span>loterías leídas</span></div>
+          <div class="cifra"><b>${r.sorteadas}<small> / ${r.loterias}</small></b><span>ya sorteadas</span></div>
+          <div class="cifra oro"><b>${r.aciertos}<small> / ${r.jugados}</small></b><span>números acertados</span></div>
+          <div class="cifra"><b>${r.jugados ? (r.aciertos / r.esperado).toFixed(2) + "x" : "—"}</b><span>${r.jugados ? `vs azar (esperado ${r.esperado.toFixed(1)})` : "aún sin sorteos"}</span></div>
+        </div>
+      </div>
+      ${vision(principal)}
+    </section>
+
+    ${resto.length ? `
+      <h3 class="titulo">Jugadas maestras <small>las de más fuerza${d.fecha === d.hoy ? " que aún puedes jugar" : ""}</small></h3>
+      <div class="maestras">${resto.map((x, i) => `
+        <a class="maestra" href="${enlaceLoteria(x.loteria)}">
+          <span class="romano">${ROMANOS[i + 1]}</span>
+          ${orbe(x, 58, i)}
+          <span class="lot">${esc(x.loteria)}</span>
+          <span class="grupo">${esc(x.grupo)}</span>
+        </a>`).join("")}
+      </div>` : ""}
+
+    <h3 class="titulo">Todas las loterías <small>3 números por sorteo · el anillo marca la fuerza</small></h3>
+    <div class="filtros" id="filtros"></div>
+    <div id="lista"></div>
+
+    <div class="dos-col">
+      <div>
+        <h3 class="titulo">El historial del Oráculo <small>últimos ${d.dias_prueba} días, sin ver el futuro</small></h3>
+        ${historialOraculo(d)}
+      </div>
+      <div>
+        <h3 class="titulo">El Consejo <small>el peso que gana cada regla</small></h3>
+        ${consejo(d)}
+      </div>
+    </div>`;
+
+  $("#ant").onclick = () => ir(`oraculo/${d.anterior}`);
+  $("#sig").onclick = () => ir(`oraculo/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`oraculo/${e.target.value}`);
+  if ($("#hoy")) $("#hoy").onclick = () => ir("oraculo");
+  pintarFiltros();
+  pintarLista();
+}
+
+function pintarFiltros() {
+  const grupos = datosOraculo.grupos.map((g) => g.grupo);
+  if (filtros.grupo && !grupos.includes(filtros.grupo)) filtros.grupo = "";
+  $("#filtros").innerHTML = `
+    ${["", ...grupos].map((g) => `<button class="chip-btn${filtros.grupo === g ? " activo" : ""}" data-grupo="${esc(g)}">${esc(g || "Todas")}</button>`).join("")}
+    <label><input type="checkbox" id="pendientes" ${filtros.pendientes ? "checked" : ""}> Solo pendientes</label>
+    <input class="buscar" id="buscar-rec" type="search" placeholder="Buscar lotería…" value="${esc(filtros.buscar)}">`;
+  document.querySelectorAll(".chip-btn").forEach((b) => b.onclick = () => {
+    filtros.grupo = b.dataset.grupo; pintarFiltros(); pintarLista();
+  });
+  $("#pendientes").onchange = (e) => { filtros.pendientes = e.target.checked; pintarLista(); };
+  $("#buscar-rec").oninput = (e) => { filtros.buscar = e.target.value; pintarLista(); };
+}
+
+function tarjeta(l, grupo) {
+  const aciertos = l.oraculo.filter((x) => x.acierto).length;
+  const estado = !l.resultado ? `<span class="sello oro">Pendiente</span>`
+    : aciertos ? `<span class="sello acierto">✓ ${plural(aciertos, "acierto", "aciertos")}</span>`
+    : `<span class="sello">Sin aciertos</span>`;
+  const elegidos = new Set(l.oraculo.map((x) => x.numero));
+  const pie = l.resultado
+    ? `Salió ${`<div class="bolas">${l.resultado.map((n) =>
+        `<span class="bola chica${elegidos.has(n) ? " acierto" : ""}">${esc(n)}</span>`).join("")}</div>`}`
+    : `Último · ${esc(fechaMini(l.ultimo.fecha))} ${bolas(l.ultimo.numeros, "chica")}`;
+  const senales = l.senales.map((s) => `<div class="senal"><span>${esc(s.regla)}</span>
+    <div class="bolas">${s.numeros.map((n) => `<span class="bola chica${n.acierto ? " acierto" : elegidos.has(n.numero) ? " oro" : ""}">${esc(n.numero)}</span>`).join("")}</div></div>`).join("");
+  return `<article class="rec${aciertos ? " gano" : ""}">
+    <div class="rec-cab">
+      <div><a class="nombre" href="${enlaceLoteria(l.nombre)}">${esc(l.nombre)}</a><div class="grupo">${esc(grupo)}</div></div>
+      ${estado}
+    </div>
+    <div class="rec-orbes">${l.oraculo.map((x, i) => orbe(x, 54, i)).join("")}</div>
+    <div class="rec-pie">${pie}</div>
+    <details class="senales"><summary>Ver las ${l.senales.length} señales que escuchó</summary>
+      <div class="lista-senales">${senales}</div></details>
+  </article>`;
+}
+
+function pintarLista() {
+  const f = filtros.buscar.toLowerCase();
+  const grupos = datosOraculo.grupos
+    .filter((g) => !filtros.grupo || g.grupo === filtros.grupo)
+    .map((g) => ({ ...g, loterias: g.loterias.filter((l) =>
+      (!filtros.pendientes || !l.resultado) &&
+      (!f || l.nombre.toLowerCase().includes(f) || g.grupo.toLowerCase().includes(f))) }))
+    .filter((g) => g.loterias.length);
+  $("#lista").innerHTML = grupos.length ? grupos.map((g) => `
+    <section class="grupo-sec"><h3>${esc(g.grupo)}</h3>
+      <div class="recs">${g.loterias.map((l) => tarjeta(l, g.grupo)).join("")}</div></section>`).join("")
+    : `<div class="vacio panel">${datosOraculo.grupos.length ? "Ninguna lotería coincide con el filtro." : "No hay jugadas para este día."}</div>`;
+}
+
+// ------------------------------------------------------------ vista por día
+
+async function vistaDia(fecha) {
+  const d = await api(`/api/dia?fecha=${encodeURIComponent(fecha)}`);
+  const filtro = busqueda.toLowerCase();
+  const grupos = d.grupos
+    .map((g) => ({ ...g, loterias: g.loterias.filter((l) =>
+      !filtro || l.nombre.toLowerCase().includes(filtro) || g.grupo.toLowerCase().includes(filtro)) }))
+    .filter((g) => g.loterias.length);
+
+  $("#vista").innerHTML = `
+    <div class="controles">
+      <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior con resultados">‹</button>
+      <input type="date" id="fecha" value="${esc(d.fecha)}" min="${esc(resumen.desde)}" max="${esc(resumen.hasta)}">
+      <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente con resultados">›</button>
+      <h2>${esc(fechaLarga(d.fecha))}</h2>
+      <input class="buscar" id="buscar" type="search" placeholder="Buscar lotería…" value="${esc(busqueda)}">
+    </div>
+    ${grupos.length ? grupos.map((g) => `
+      <section class="grupo">
+        <h3>${esc(g.grupo)}</h3>
+        <div class="tarjetas">${g.loterias.map((l) => `
+          <button class="tarjeta" data-loteria="${esc(l.nombre)}">
+            <div class="nombre">${esc(l.nombre)}</div>${bolas(l.numeros)}
+          </button>`).join("")}
+        </div>
+      </section>`).join("")
+    : `<div class="vacio panel">${d.grupos.length ? "Ninguna lotería coincide con la búsqueda." : "No hay resultados guardados para este día."}</div>`}`;
+
+  $("#ant").onclick = () => ir(`dia/${d.anterior}`);
+  $("#sig").onclick = () => ir(`dia/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`dia/${e.target.value}`);
+  const buscar = $("#buscar");
+  buscar.oninput = () => { busqueda = buscar.value; vistaDia(d.fecha).then(() => {
+    const b = $("#buscar"); b.focus(); b.setSelectionRange(b.value.length, b.value.length); }); };
+  document.querySelectorAll(".tarjeta").forEach((t) =>
+    t.onclick = () => ir(`loteria/${encodeURIComponent(t.dataset.loteria)}`));
+}
+
+// -------------------------------------------------------- vista por lotería
+
+async function vistaLoteria(nombre) {
+  if (!nombre) nombre = resumen.grupos[0].loterias[0].nombre;
+  const opciones = resumen.grupos.map((g) => `<optgroup label="${esc(g.grupo)}">${g.loterias.map((l) =>
+    `<option ${l.nombre === nombre ? "selected" : ""}>${esc(l.nombre)}</option>`).join("")}</optgroup>`).join("");
+
+  const [d, rec] = await Promise.all([
+    api(`/api/loteria?nombre=${encodeURIComponent(nombre)}&n=100`),
+    api(`/api/recomendaciones?loteria=${encodeURIComponent(nombre)}`).catch(() => null),
+  ]);
+  const [ultimo, ...anteriores] = d.sorteos;
+  const chips = (lista, [uno, varios]) => `<div class="chips">${lista.map(([num, n]) =>
+    `<span class="chip"><span class="bola">${esc(num)}</span><small>${n} ${n === 1 ? uno : varios}</small></span>`).join("")}</div>`;
+  const miRec = rec && rec.grupos.flatMap((g) => g.loterias).find((l) => l.nombre === nombre);
+  if (miRec) fuerzaMax = Math.max(0.0001, ...miRec.oraculo.map((x) => x.fuerza));
+
+  $("#vista").innerHTML = `
+    <div class="controles">
+      <select id="elegir">${opciones}</select>
+      <span class="info">${d.total} sorteos guardados desde el ${esc(fechaCorta(d.desde))}</span>
+    </div>
+    <div class="detalle">
+      <div class="panel">
+        <h3>Último resultado · ${esc(fechaLarga(ultimo.fecha))}</h3>
+        <div class="grande">${bolas(ultimo.numeros)}</div>
+        <h3 style="margin-top:26px">Anteriores</h3>
+        <table><tbody>${anteriores.map((s) => `
+          <tr><td class="fecha"><a href="#dia/${esc(s.fecha)}">${esc(fechaCorta(s.fecha))}</a></td>
+          <td>${bolas(s.numeros)}</td></tr>`).join("")}
+        </tbody></table>
+        ${d.total > d.sorteos.length ? `<p class="nota">Se muestran los últimos ${d.sorteos.length}.</p>` : ""}
+      </div>
+      <div class="lateral">
+        ${miRec ? `<div class="panel" style="border-color:var(--borde-fuerte);box-shadow:0 0 40px rgba(243,207,118,.08)">
+          <h3>✦ El Oráculo dice</h3>
+          <div class="rec-orbes">${miRec.oraculo.map((x, i) => orbe(x, 54, i)).join("")}</div>
+          <p class="nota">${miRec.resultado ? `Ya salió: ${esc(miRec.resultado.join(" - "))}.` : "Sorteo de hoy pendiente."}
+            <a href="#oraculo">Ver todas las visiones</a></p>
+        </div>` : ""}
+        <div class="panel">
+          <h3>Más salidos</h3>
+          ${chips(d.mas_salidos, ["vez", "veces"])}
+          <p class="nota">En los ${d.total} sorteos guardados.</p>
+        </div>
+        ${d.atrasados.length ? `<div class="panel">
+          <h3>Más atrasados</h3>
+          ${chips(d.atrasados, ["sorteo", "sorteos"])}
+          <p class="nota">Sorteos seguidos sin salir.</p>
+        </div>` : ""}
+      </div>
+    </div>`;
+
+  $("#elegir").onchange = (e) => ir(`loteria/${encodeURIComponent(e.target.value)}`);
+}
+
+// --------------------------------------------------------------- actualizar
+
+$("#actualizar").onclick = async () => {
+  const boton = $("#actualizar");
+  boton.disabled = true;
+  boton.textContent = "Consultando…";
+  aviso("");
+  try {
+    const r = await api("/api/actualizar", { method: "POST" });
+    aviso(r.nuevos ? `Listo: ${r.nuevos} sorteos nuevos.` : "Ya estaba todo al día.");
+    resumen = null;
+    await mostrar();
+  } catch (e) {
+    aviso(`No se pudo actualizar: ${e.message}`, true);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = "Actualizar";
+  }
+};
+
+window.addEventListener("hashchange", () => { aviso(""); mostrar(); });
+mostrar();
+</script>
+</body>
+</html>

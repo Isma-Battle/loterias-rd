@@ -1,0 +1,12 @@
+# Despliegue en Render (plan gratis). En render.com: New → Blueprint → elige este repositorio.
+services:
+  - type: web
+    name: loterias-rd
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py web
+    healthCheckPath: /api/resumen
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"

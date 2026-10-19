@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Abrir interfaz web",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "web"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Actualizar resultados de hoy",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "actualizar"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Descargar historial (30 días)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "historial",
+        "--dias",
+        "30"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Predicciones de hoy",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "predecir"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Probar reglas con el historial",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "probar"
+      ],
+      "console": "integratedTerminal"
+    }
+  ]
+}

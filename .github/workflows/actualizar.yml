@@ -1,0 +1,28 @@
+# Descarga los resultados cada día y guarda la base de datos en el repositorio.
+# Render vuelve a desplegar con cada commit, así la copia en la nube no se queda atrás.
+name: Actualizar resultados
+
+on:
+  schedule:
+    - cron: "30 4 * * *"   # 00:30 en RD (UTC-4), tras los últimos sorteos de la noche
+  workflow_dispatch:        # también se puede lanzar a mano desde la pestaña Actions
+
+permissions:
+  contents: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python main.py actualizar
+      - name: Guardar si hay sorteos nuevos
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add datos/loterias.db
+          git diff --cached --quiet || { git commit -m "Resultados $(date -u +%F)" && git push; }
