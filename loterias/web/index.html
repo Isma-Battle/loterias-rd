@@ -282,6 +282,16 @@
   .peso::after { content: ""; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--tenue); opacity: .6; }
   .consejero .v { font: 700 14px var(--display); color: var(--marfil); text-align: right; font-variant-numeric: tabular-nums; }
 
+  /* ------------------------------------------------- loterías indicadas */
+  .base { display: grid; gap: 20px; }
+  .base .etiqueta { display: block; font: 600 11px var(--display); letter-spacing: .26em; color: var(--tenue); text-transform: uppercase; margin-bottom: 10px; }
+  .jugadas-ind { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--tenue); }
+  .jugadas-ind > div { display: flex; gap: 8px; align-items: center; }
+  .jugadas-ind .bolas { gap: 4px; }
+  .secuencia b { color: var(--oro); font-weight: 600; }
+  .maestra.gano { border-color: rgba(56, 226, 160, .45); box-shadow: 0 0 30px rgba(56, 226, 160, .1); }
+  .lista-senales .nota { margin-top: 4px; }
+
   footer { max-width: 1240px; margin: 0 auto; padding: 0 20px 40px; }
   footer p { font-size: 12.5px; color: var(--muy-tenue); text-align: center; line-height: 1.7; margin: 0; }
 
@@ -339,6 +349,7 @@
     <span class="info" id="info"></span>
     <nav>
       <a href="#oraculo" id="tab-oraculo">El Oráculo</a>
+      <a href="#indicadas" id="tab-indicadas">Loterías indicadas</a>
       <a href="#dia" id="tab-dia">Resultados</a>
       <a href="#loteria" id="tab-loteria">Por lotería</a>
     </nav>
@@ -413,14 +424,15 @@ function ir(hash) { location.hash = hash; }
 
 async function mostrar() {
   const [vistaHash, ...resto] = location.hash.slice(1).split("/");
-  const vista = ["dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
+  const vista = ["indicadas", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
   const param = decodeURIComponent(resto.join("/"));
-  for (const v of ["oraculo", "dia", "loteria"])
+  for (const v of ["oraculo", "indicadas", "dia", "loteria"])
     $(`#tab-${v}`).classList.toggle("activo", v === vista);
   try {
     if (!resumen) await cargarResumen();
     if (!resumen.total) { $("#vista").innerHTML = sinDatos(); return; }
     if (vista === "loteria") await vistaLoteria(param);
+    else if (vista === "indicadas") await vistaIndicadas(param);
     else if (vista === "dia") await vistaDia(param || resumen.hasta);
     else await vistaOraculo(param);
   } catch (e) {
@@ -656,6 +668,143 @@ function pintarLista() {
     <section class="grupo-sec"><h3>${esc(g.grupo)}</h3>
       <div class="recs">${g.loterias.map((l) => tarjeta(l, g.grupo)).join("")}</div></section>`).join("")
     : `<div class="vacio panel">${datosOraculo.grupos.length ? "Ninguna lotería coincide con el filtro." : "No hay jugadas para este día."}</div>`;
+}
+
+// ------------------------------------------------------ loterías indicadas
+
+const bolaChica = (n, acierto) => `<span class="bola chica${acierto === true ? " acierto" : ""}">${esc(n)}</span>`;
+const jugadaChica = (j) => `<div class="bolas">${j.numeros.map((n) =>
+  `<span class="bola chica ${claseJugada(j)}">${esc(n)}</span>`).join("")}</div>`;
+
+function tarjetaIndicada(l) {
+  const aciertos = l.jugadas.filter((x) => x.acierto).length;
+  const estado = !l.resultado ? `<span class="sello oro">Pendiente</span>`
+    : aciertos ? `<span class="sello acierto">✓ ${plural(aciertos, "acierto", "aciertos")}</span>`
+    : `<span class="sello">Sin aciertos</span>`;
+  const elegidos = new Set(l.jugadas.map((x) => x.numero));
+  const pie = l.resultado
+    ? `Salió <div class="bolas">${l.resultado.map((n) => bolaChica(n, elegidos.has(n))).join("")}</div>`
+    : `Último · ${esc(fechaMini(l.ultimo.fecha))} ${bolas(l.ultimo.numeros, "chica")}`;
+  const fuentes = l.fuentes.map((f) => `<div class="senal"><span>${esc(f.fuente)}</span>
+    <div class="bolas">${f.numeros.length ? f.numeros.map((n) => bolaChica(n.numero, n.acierto)).join("") : "—"}</div></div>`).join("");
+  const secuencias = l.secuencias.map((s) => `<div class="senal secuencia">
+    <span>${esc(s.texto.replaceAll("-", " – "))}${s.nota ? ` <b>${esc(s.nota)}</b>` : ""}</span>
+    <div class="respaldo">${s.pales.map((p) => `<span class="sello${p.acierto ? " acierto" : ""}">${esc(p.numeros.join("-"))}</span>`).join("")}</div></div>`).join("");
+  return `<article class="rec${aciertos ? " gano" : ""}">
+    <div class="rec-cab">
+      <div><a class="nombre" href="${enlaceLoteria(l.nombre)}">${esc(l.nombre)}</a><div class="grupo">${esc(l.etiqueta)}</div></div>
+      ${estado}
+    </div>
+    <div class="rec-orbes">${l.jugadas.map((x, i) => `<div class="orbe" style="--i:${i}" title="${esc(x.fuentes.join(", "))}">
+      <span class="bola ${claseJugada(x)}" style="width:54px;height:54px;font-size:21px">${esc(x.numero)}</span>
+      <small>${x.acierto === true ? "¡SALIÓ!" : plural(x.votos, "fuente", "fuentes")}</small></div>`).join("")}</div>
+    <div class="jugadas-ind">
+      <div>Palé ${jugadaChica(l.pale)}</div>
+      <div>Tripleta ${jugadaChica(l.tripleta)}</div>
+    </div>
+    <div class="rec-pie">${pie}</div>
+    <details class="senales"><summary>Ver de dónde salen</summary>
+      <div class="lista-senales">${fuentes}
+        ${secuencias ? `<p class="nota">Secuencias del Libro oculto que activó el último sorteo:</p>${secuencias}` : ""}</div></details>
+  </article>`;
+}
+
+function tarjetaPrimero(l, i) {
+  const [principal, ...respaldo] = l.primero;
+  const real = l.resultado && l.resultado[0];
+  const estado = !real ? `<span class="sello oro">Pendiente</span>`
+    : l.primero.some((x) => x.acierto) ? `<span class="sello acierto">✓ Salió ${esc(real)}</span>`
+    : `<span class="sello">Salió ${esc(real)}</span>`;
+  return `<a class="maestra${principal.acierto ? " gano" : ""}" href="${enlaceLoteria(l.nombre)}"
+      title="${esc(`${principal.numero}: ${principal.fuentes.join(", ")}`)}">
+    <span class="romano">${ROMANOS[i]}</span>
+    <div class="orbe" style="--i:${i}">
+      <span class="bola ${claseJugada(principal)}" style="width:62px;height:62px;font-size:25px">${esc(principal.numero)}</span>
+      <small>${plural(principal.votos, "fuente", "fuentes")}</small>
+    </div>
+    <div class="bolas">${respaldo.map((x) => `<span class="bola chica ${claseJugada(x)}">${esc(x.numero)}</span>`).join("")}</div>
+    <span class="lot">${esc(l.nombre)}</span>
+    <span class="grupo">1er premio anterior: ${esc(l.ultimo.numeros[0])}</span>
+    ${estado}
+  </a>`;
+}
+
+function pruebaPrimero(d) {
+  const p = d.prueba_primero, pct = (x) => `${(x * 100).toFixed(0)} %`;
+  const fila = (t, m) => `<div class="kpi"><b>${m.aciertos}</b><span>${t} · el azar daría ${m.esperado.toFixed(1)}
+    (${p.sorteos ? m.vs_azar.toFixed(2) + "x" : "—"})</span></div>`;
+  return `<div class="panel" style="margin-top:14px">
+    <div class="kpis">
+      ${fila(`veces que el número principal fue el 1er premio, en ${p.sorteos} sorteos`, p.principal)}
+      ${fila("veces que el 1er premio estuvo entre los 3", p.tres)}
+    </div>
+    <p class="nota">Se calcula con los últimos ${d.dias_prueba} días, sin ver el resultado antes de jugar.
+      Lo dispara el 1er premio del sorteo anterior (repite y Libro oculto), junto con los números del día y de la fecha;
+      en los empates gana el que más ha salido de 1er premio últimamente.
+      Probabilidad real de que un número sea el 1er premio: ${pct(d.prob_primero)} (1 de cada 100);
+      con los 3 números, ${pct(3 * d.prob_primero)}.</p>
+  </div>`;
+}
+
+function pruebaIndicadas(d) {
+  return `<div class="panel consejo">${d.prueba.map((r, i) => `
+    <div class="consejero" title="${esc(`${r.nombre}: ${r.aciertos} aciertos de ${r.numeros} números (Z = ${r.z.toFixed(1)})`)}">
+      <span class="pos">${ROMANOS[i] ?? i + 1}</span>
+      <div><div class="n">${esc(r.nombre)}</div>
+        <div class="d">${esc(r.descripcion)} ${r.aciertos} aciertos de ${r.numeros} números; el azar daría ${r.esperado.toFixed(0)}.</div></div>
+      <div class="peso"><span style="width:${Math.min(100, r.vs_azar * 50)}%"></span></div>
+      <span class="v">${r.numeros ? r.vs_azar.toFixed(2) + "x" : "—"}</span>
+    </div>`).join("")}
+    <p class="nota" style="margin:10px 6px 0">1.00x (la raya) es acertar igual que jugando números al azar; más de 1 es mejor.
+      Se mide en estas loterías durante los últimos ${d.dias_prueba} días, sin ver el resultado antes de jugar.</p>
+  </div>`;
+}
+
+async function vistaIndicadas(fecha) {
+  const d = await api(`/api/indicadas${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  const r = d.resumen;
+  const diaSemana = aFecha(d.fecha).toLocaleDateString("es-DO", { weekday: "long" });
+  $("#vista").innerHTML = `
+    <section class="heroe">
+      <div>
+        <div class="eyebrow">✦ Libro de Rosita · Libro oculto</div>
+        <h2>Loterías indicadas</h2>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · los números en que más coinciden el día, la fecha, los que repiten y las secuencias</div>
+        <div class="nav-fecha">
+          <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
+          <input type="date" id="fecha" value="${esc(d.fecha)}">
+          <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
+          ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
+        </div>
+        <div class="cifras">
+          <div class="cifra"><b>${r.loterias}</b><span>loterías indicadas</span></div>
+          <div class="cifra"><b>${r.sorteadas}<small> / ${r.loterias}</small></b><span>ya sorteadas</span></div>
+          <div class="cifra oro"><b>${r.aciertos}<small> / ${r.jugados}</small></b><span>números acertados</span></div>
+          <div class="cifra"><b>${r.jugados ? (r.aciertos / r.esperado).toFixed(2) + "x" : "—"}</b><span>${r.jugados ? `vs azar (esperado ${r.esperado.toFixed(1)})` : "aún sin sorteos"}</span></div>
+        </div>
+      </div>
+      <div class="base">
+        <div><span class="etiqueta">Números del ${esc(diaSemana)}</span>${bolas(d.dia, "chica")}</div>
+        <div><span class="etiqueta">Números del día ${aFecha(d.fecha).getDate()}</span>${bolas(d.del_mes, "chica")}</div>
+        <p class="nota">Valen para todas las loterías. La “v” del libro ya está aplicada: cada número va con su volteo.</p>
+      </div>
+    </section>
+
+    <h3 class="titulo">Las indicadas <small>quiniela, palé y tripleta por lotería</small></h3>
+    ${d.loterias.length ? `<div class="recs">${d.loterias.map(tarjetaIndicada).join("")}</div>`
+      : `<div class="vacio panel">No hay datos de estas loterías para este día.</div>`}
+
+    <h3 class="titulo">El primer premio <small>un número principal y dos de respaldo por lotería</small></h3>
+    ${d.loterias.length ? `<div class="maestras">${d.loterias.map(tarjetaPrimero).join("")}</div>
+      ${pruebaPrimero(d)}` : ""}
+
+    <h3 class="titulo">¿Cómo le ha ido al método? <small>últimos ${d.dias_prueba} días, sin ver el futuro</small></h3>
+    ${pruebaIndicadas(d)}`;
+
+  $("#ant").onclick = () => ir(`indicadas/${d.anterior}`);
+  $("#sig").onclick = () => ir(`indicadas/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`indicadas/${e.target.value}`);
+  if ($("#hoy")) $("#hoy").onclick = () => ir("indicadas");
 }
 
 // ------------------------------------------------------------ vista por día

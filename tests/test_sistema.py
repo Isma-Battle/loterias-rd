@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from loterias import motor  # noqa: E402
 from loterias.db import Sorteo  # noqa: E402
 from loterias.recolector import leer_nombres, leer_sesiones  # noqa: E402
+from loterias.reglas import indicadas  # noqa: E402
 from loterias.reglas.base import Contexto, Regla  # noqa: E402
 
 SITIO = {"siteCompanies": [
@@ -75,6 +76,29 @@ class TestMotor(unittest.TestCase):
     def test_predecir(self):
         p = motor.predecir(self.datos, [ReglaQueVeElFuturo()], date(2026, 1, 11))
         self.assertEqual(p[0].numeros, ["10", "50", "60"])
+
+
+class TestIndicadas(unittest.TestCase):
+    def test_volteo(self):
+        self.assertEqual(indicadas.jugar("69v 61 09v"), ["69", "96", "61", "09", "90"])
+
+    def test_combina_las_fuentes(self):
+        # Lunes 19: sale 05-00-33 -> 05 repite como 50, el libro da 05-50 y 33-88-...
+        ultimo = Sorteo("Quiniela Leidsa", "Leidsa", date(2026, 10, 18), ("05", "00", "33"))
+        a = indicadas.analizar(Contexto("Quiniela Leidsa", date(2026, 10, 19), [ultimo], [ultimo]))
+        self.assertEqual(a.fuentes["Rosita · repite"], ["50", "05", "01"])
+        self.assertIn("50", a.fuentes["Libro oculto"])
+        # 2 fuentes cada uno: 01 (00 repite como 01 + 10v del libro), 50 y 88 (día + libro)
+        self.assertEqual({j.numero for j in a.jugadas[:3]}, {"01", "50", "88"})
+        self.assertEqual(a.jugadas[0].votos, 2)
+
+    def test_primer_premio_solo_mira_el_primero(self):
+        # Solo el 05 dispara: repite (50, 05) y libro (05-50); el 00 y el 33 no cuentan
+        ultimo = Sorteo("Quiniela Leidsa", "Leidsa", date(2026, 10, 18), ("05", "00", "33"))
+        a = indicadas.primer_premio(Contexto("Quiniela Leidsa", date(2026, 10, 19), [ultimo], [ultimo]))
+        self.assertEqual(a.fuentes["Rosita · repite"], ["50", "05"])
+        self.assertEqual(a.fuentes["Libro oculto"], ["50"])
+        self.assertEqual((a.jugadas[0].numero, a.jugadas[0].votos), ("50", 2))
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ y pide los datos a estas rutas (todas devuelven JSON):
     GET  /api/loteria?nombre=...&n=60    historial y estadísticas de una lotería
     GET  /api/recomendaciones?fecha=...  números recomendados por las reglas para ese día
          (&loteria=... para una sola)
+    GET  /api/indicadas?fecha=...        loterías indicadas según el Libro de Rosita y el Libro oculto
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
@@ -28,6 +29,8 @@ from urllib.parse import parse_qs, urlparse
 
 from . import db, motor, recolector
 from .reglas import TODAS as REGLAS
+from .reglas import Contexto
+from .reglas import indicadas as libro
 
 PAGINA = Path(__file__).resolve().parent / "web" / "index.html"
 
@@ -205,6 +208,137 @@ def recomendaciones(con, fecha: date, solo: str | None = None) -> dict | None:
     }
 
 
+# ---------------------------------------------------------- loterías indicadas
+
+_cache_libro: dict = {}
+
+
+def _prueba_libro(todos: list[db.Sorteo], fecha: date) -> motor.Simulacion:
+    """Cómo le fue al método de los libros en los DIAS_PRUEBA anteriores a `fecha`."""
+    clave = (fecha, len(todos))
+    if clave not in _cache_libro:
+        previos = [s for s in todos if s.fecha < fecha]
+        _cache_libro.clear()
+        _cache_libro[clave] = motor.simular(previos, libro.REGLAS, fecha - timedelta(days=DIAS_PRUEBA),
+                                            libro.NOMBRES)
+    return _cache_libro[clave]
+
+
+def _prueba_primero(todos: list[db.Sorteo], fecha: date) -> dict:
+    """Cuántas veces el número principal (y los 3 candidatos) acertó el 1er premio
+    en los DIAS_PRUEBA anteriores a `fecha`, sin ver el resultado antes de jugar."""
+    clave = ("primero", fecha, len(todos))
+    if clave not in _cache_libro:
+        desde = fecha - timedelta(days=DIAS_PRUEBA)
+        historial: dict[str, list[db.Sorteo]] = defaultdict(list)
+        sorteos = principal = en_tres = 0
+        for s in todos:
+            if s.fecha >= fecha:
+                break
+            if s.loteria not in libro.NOMBRES:
+                continue
+            h = historial[s.loteria]
+            if h and s.fecha >= desde:
+                candidatos = [j.numero for j in
+                              libro.primer_premio(Contexto(s.loteria, s.fecha, h, [])).jugadas[:libro.JUGADAS]]
+                sorteos += 1
+                principal += candidatos[0] == s.numeros[0]
+                en_tres += s.numeros[0] in candidatos
+            h.append(s)
+        p = libro.PROB_PRIMERO
+
+        def medir(aciertos: int, jugados: int, prob: float) -> dict:
+            esperado = jugados * prob
+            var = jugados * prob * (1 - prob)
+            return {"aciertos": aciertos, "esperado": round(esperado, 2),
+                    "vs_azar": round(aciertos / esperado, 3) if esperado else 0,
+                    "z": round((aciertos - esperado) / var ** .5, 2) if var else 0}
+
+        _cache_libro[clave] = {"sorteos": sorteos, "principal": medir(principal, sorteos, p),
+                               "tres": medir(en_tres, sorteos, libro.JUGADAS * p)}
+    return _cache_libro[clave]
+
+
+def _salio(salidos: set[str] | None, numeros) -> bool | None:
+    """None si el sorteo no ha salido; si no, si salieron todos los números."""
+    return None if salidos is None else all(n in salidos for n in numeros)
+
+
+def indicadas(con, fecha: date) -> dict | None:
+    todos = db.cargar(con)
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    previos = [s for s in todos if s.fecha < fecha]
+    historial: dict[str, list[db.Sorteo]] = defaultdict(list)
+    reales: dict[str, db.Sorteo] = {}
+    for s in todos:
+        if s.loteria in libro.NOMBRES:
+            if s.fecha < fecha:
+                historial[s.loteria].append(s)
+            elif s.fecha == fecha:
+                reales[s.loteria] = s
+
+    tarjetas = []
+    jugados = aciertos = 0
+    for etiqueta, nombre in libro.INDICADAS:
+        h = historial.get(nombre)
+        if not h or (fecha - h[-1].fecha).days > DIAS_INACTIVA:
+            continue
+        ctx = Contexto(nombre, fecha, h, previos)
+        a = libro.analizar(ctx)
+        pp = libro.primer_premio(ctx)
+        real = reales.get(nombre)
+        salidos = set(real.numeros) if real else None
+        elegidos = [j.numero for j in a.jugadas[:libro.JUGADAS]]
+        jugadas = [{"numero": j.numero, "votos": j.votos, "fuentes": j.fuentes,
+                    "acierto": _salio(salidos, [j.numero])} for j in a.jugadas[:libro.JUGADAS]]
+        if salidos is not None:
+            jugados += len(jugadas)
+            aciertos += sum(x["acierto"] for x in jugadas)
+        tarjetas.append({
+            "etiqueta": etiqueta,
+            "nombre": nombre,
+            "jugadas": jugadas,
+            "pale": {"numeros": elegidos[:2], "acierto": _salio(salidos, elegidos[:2])},
+            "tripleta": {"numeros": elegidos, "acierto": _salio(salidos, elegidos)},
+            "fuentes": [{"fuente": f, "numeros": [{"numero": n, "acierto": _salio(salidos, [n])} for n in nums]}
+                        for f, nums in a.fuentes.items()],
+            "secuencias": [{"texto": s.texto, "nota": s.nota,
+                            "pales": [{"numeros": p.split("-"), "acierto": _salio(salidos, p.split("-"))}
+                                      for p in s.pales]} for s in a.secuencias],
+            "primero": [{"numero": j.numero, "votos": j.votos, "fuentes": j.fuentes,
+                         "acierto": None if real is None else j.numero == real.numeros[0]}
+                        for j in pp.jugadas[:libro.JUGADAS]],
+            "resultado": list(real.numeros) if real else None,
+            "ultimo": {"fecha": h[-1].fecha.isoformat(), "numeros": list(h[-1].numeros)},
+        })
+
+    sim = _prueba_libro(todos, fecha)
+    primero, tope = todos[0].fecha, max(hoy, todos[-1].fecha) + timedelta(days=1)
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primero else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha + timedelta(days=1) <= tope else None,
+        "dia": libro.POR_DIA[fecha.weekday()],
+        "del_mes": libro.POR_FECHA[fecha.day],
+        "resumen": {
+            "loterias": len(tarjetas),
+            "sorteadas": sum(1 for t in tarjetas if t["resultado"]),
+            "jugados": jugados,
+            "aciertos": aciertos,
+            "esperado": round(jugados * motor.PROB_AZAR, 2),
+        },
+        "loterias": tarjetas,
+        "prueba": [{"nombre": r.nombre, "descripcion": r.descripcion, **_stats(sim.resultados[r.nombre])}
+                   for r in libro.REGLAS],
+        "prueba_primero": _prueba_primero(todos, fecha),
+        "prob_primero": libro.PROB_PRIMERO,
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
 _descargando = threading.Lock()
 
 
@@ -274,6 +408,15 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     except ValueError:
                         fecha = datetime.now(recolector.ZONA_RD).date()
                     datos = recomendaciones(con, fecha, q.get("loteria"))
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/indicadas":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = indicadas(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)
