@@ -1,14 +1,15 @@
 """Loterías indicadas: la metodología del Libro de Rosita y del Libro oculto.
 
-Cuatro fuentes, cada una es una regla normal (así la prueba histórica las mide):
+Cinco fuentes, cada una es una regla normal (así la prueba histórica las mide):
 
     Rosita · día      los números de cada día de la semana
     Rosita · fecha    los números de cada día del mes
     Rosita · repite   "cuando sale el 05 repite como 50 y 05"...
     Libro oculto      secuencias: cuando sale el primer número, vienen los demás
+    Master            la fila del libro Master KA para el último 1er premio (reglas/master.py)
 
 Una "v" después del número es voltearlo: se juega también al revés (23 -> 32).
-La regla "Loterías indicadas" junta las cuatro y juega los números en que más coinciden.
+La regla "Loterías indicadas" junta las cinco y juega los números en que más coinciden.
 
 No están en el Oráculo (reglas/__init__.py); para añadirlas, suma REGLAS a TODAS.
 """
@@ -19,6 +20,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 from .base import Contexto, Regla, espejo, limpiar
+from .master import LIBRO as MASTER
 
 # (como se muestra, nombre en la base de datos), en el orden de la sección
 INDICADAS = [
@@ -152,13 +154,14 @@ class Analisis:
 
 
 def _combinar(ctx: Contexto, salidos, frec) -> Analisis:
-    """Junta las cuatro fuentes disparadas por `salidos`; los empates los rompe `frec`."""
+    """Junta las cinco fuentes disparadas por `salidos`; los empates los rompe `frec`."""
     secuencias = [s for s in LIBRO if s.activa_con.intersection(salidos)]
     fuentes = {
         "Rosita · día": POR_DIA[ctx.fecha.weekday()],
         "Rosita · fecha": POR_FECHA[ctx.fecha.day],
         "Rosita · repite": limpiar(n for x in salidos for n in REPITE.get(x, [])),
         "Libro oculto": limpiar(n for s in secuencias for n in s.numeros),
+        "Master": MASTER[ctx.ultimo.numeros[0]],
     }
     apoyo: dict[str, list[str]] = defaultdict(list)
     for fuente, numeros in fuentes.items():
@@ -194,7 +197,7 @@ class Fuente(Regla):
 
 class Indicadas(Regla):
     nombre = "Loterías indicadas"
-    descripcion = "Los 3 números en que más coinciden las cuatro fuentes de los libros."
+    descripcion = "Los 3 números en que más coinciden las cinco fuentes de los libros."
     loterias = NOMBRES
 
     def predecir(self, ctx: Contexto) -> list[str]:
@@ -207,4 +210,5 @@ REGLAS = [
     Fuente("Rosita · fecha", "Los números del día del mes."),
     Fuente("Rosita · repite", "Cuando sale un número, repite como su pareja."),
     Fuente("Libro oculto", "Las secuencias que se activan con el último sorteo."),
+    Fuente("Master", "La fila del libro Master KA para el último 1er premio."),
 ]

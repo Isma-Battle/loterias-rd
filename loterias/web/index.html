@@ -80,6 +80,7 @@
   }
   .info { color: var(--tenue); font-size: 12.5px; min-width: 0; }
   nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+  nav a { padding: 9px 13px; }
   nav a, button {
     font: 500 14px/1 var(--texto); color: var(--marfil); background: transparent;
     text-decoration: none; border: 1px solid var(--borde); border-radius: 999px;
@@ -249,7 +250,7 @@
   .rec-cab { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
   .rec-cab .nombre { font-weight: 650; font-size: 16px; text-decoration: none; }
   .rec-cab .nombre:hover { color: var(--oro); }
-  .rec-cab .grupo { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muy-tenue); margin-top: 2px; }
+  .rec-cab .grupo { margin: 2px 0 0; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muy-tenue); margin-top: 2px; }
   .rec-orbes { display: flex; justify-content: space-around; gap: 8px; padding: 4px 0; }
   .rec-pie { font-size: 12.5px; color: var(--tenue); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--borde); padding-top: 12px; }
   .rec-pie .bolas { gap: 4px; }
@@ -283,16 +284,37 @@
   .consejero .v { font: 700 14px var(--display); color: var(--marfil); text-align: right; font-variant-numeric: tabular-nums; }
 
   /* ------------------------------------------------- loterías indicadas */
-  .base { display: grid; gap: 20px; }
+  .base { display: grid; gap: 14px; align-content: center; }
+  .base p, .base .aviso { margin: 0; }
   .base .etiqueta { display: block; font: 600 11px var(--display); letter-spacing: .26em; color: var(--tenue); text-transform: uppercase; margin-bottom: 10px; }
   .jugadas-ind { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--tenue); }
   .jugadas-ind > div { display: flex; gap: 8px; align-items: center; }
   .jugadas-ind .bolas { gap: 4px; }
   .secuencia b { color: var(--oro); font-weight: 600; }
-  .siete { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-  .siete .chip { flex-direction: column; gap: 4px; }
-  .siete .bola { min-width: 0; width: 100%; max-width: 44px; height: 40px; }
-  .siete small { font-size: 11px; color: var(--tenue); font-variant-numeric: tabular-nums; }
+  .siete { display: grid; align-content: start; }
+  .pareja { display: grid; grid-template-columns: 22px auto minmax(0, 1fr) 92px; gap: 10px; align-items: center;
+    padding: 7px 2px; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .pareja:last-child { border-bottom: 0; }
+  .pareja .pos { font: 600 12px var(--display); color: var(--oro-2); text-align: center; }
+  .pareja .par { display: flex; align-items: center; gap: 4px; }
+  .pareja .par .bola { min-width: 38px; height: 38px; font-size: 15px; }
+  .pareja .par .bola.chica { min-width: 28px; height: 28px; font-size: 12px; }
+  .pareja .datos { font-size: 12.5px; line-height: 1.35; min-width: 0; }
+  .pareja .datos b { font-weight: 650; }
+  .pareja .datos .master { color: var(--oro); font-size: 11.5px; font-weight: 600; margin-left: 4px; white-space: nowrap; }
+  .pareja .datos small { display: block; color: var(--tenue); font-size: 11.5px; }
+  .pareja .f1 { text-align: right; }
+  .pareja .f1 b { display: block; font: 700 16px/1.1 var(--display); color: var(--oro); font-variant-numeric: tabular-nums; }
+  .pareja .f1 small { display: block; font-size: 10.5px; color: var(--tenue); margin-bottom: 5px; }
+  .pareja .peso { display: block; height: 4px; }
+  .ranking { display: grid; gap: 8px; }
+  .puesto { display: grid; grid-template-columns: 26px 44px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .puesto:last-child { border-bottom: 0; }
+  .puesto .pos { font: 600 13px var(--display); color: var(--oro-2); text-align: center; }
+  .puesto .bola { width: 44px; height: 44px; font-size: 17px; }
+  .puesto .d { font-size: 12px; color: var(--tenue); line-height: 1.45; }
+  .puesto .v { font: 700 15px var(--display); color: var(--oro); font-variant-numeric: tabular-nums; }
   .maestra.gano { border-color: rgba(56, 226, 160, .45); box-shadow: 0 0 30px rgba(56, 226, 160, .1); }
   .lista-senales .nota { margin-top: 4px; }
 
@@ -323,6 +345,10 @@
   .chip { display: inline-flex; align-items: center; gap: 5px; }
   .chip small { color: var(--tenue); }
 
+  /* Con tantas pestañas, el resumen de datos pasa a su propia línea antes de que se caiga el botón */
+  @media (max-width: 1360px) {
+    .barra .info { flex-basis: 100%; order: 3; }
+  }
   @media (max-width: 900px) {
     .heroe { grid-template-columns: 1fr; padding: 24px; }
     .dos-col, .detalle { grid-template-columns: 1fr; }
@@ -355,6 +381,7 @@
       <a href="#oraculo" id="tab-oraculo">El Oráculo</a>
       <a href="#indicadas" id="tab-indicadas">Loterías indicadas</a>
       <a href="#fuertes" id="tab-fuertes">Los 7 más fuertes</a>
+      <a href="#master" id="tab-master">Master</a>
       <a href="#dia" id="tab-dia">Resultados</a>
       <a href="#loteria" id="tab-loteria">Por lotería</a>
     </nav>
@@ -429,9 +456,9 @@ function ir(hash) { location.hash = hash; }
 
 async function mostrar() {
   const [vistaHash, ...resto] = location.hash.slice(1).split("/");
-  const vista = ["indicadas", "fuertes", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
+  const vista = ["indicadas", "fuertes", "master", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
   const param = decodeURIComponent(resto.join("/"));
-  for (const v of ["oraculo", "indicadas", "fuertes", "dia", "loteria"])
+  for (const v of ["oraculo", "indicadas", "fuertes", "master", "dia", "loteria"])
     $(`#tab-${v}`).classList.toggle("activo", v === vista);
   try {
     if (!resumen) await cargarResumen();
@@ -439,6 +466,7 @@ async function mostrar() {
     if (vista === "loteria") await vistaLoteria(param);
     else if (vista === "indicadas") await vistaIndicadas(param);
     else if (vista === "fuertes") await vistaFuertes(param);
+    else if (vista === "master") await vistaMaster(param);
     else if (vista === "dia") await vistaDia(param || resumen.hasta);
     else await vistaOraculo(param);
   } catch (e) {
@@ -745,7 +773,7 @@ function pruebaPrimero(d) {
       ${fila("veces que el 1er premio estuvo entre los 3", p.tres)}
     </div>
     <p class="nota">Se calcula con los últimos ${d.dias_prueba} días, sin ver el resultado antes de jugar.
-      Lo dispara el 1er premio del sorteo anterior (repite y Libro oculto), junto con los números del día y de la fecha;
+      Lo dispara el 1er premio del sorteo anterior (repite, Libro oculto y la fila del Master), junto con los números del día y de la fecha;
       en los empates gana el que más ha salido de 1er premio últimamente.
       Probabilidad real de que un número sea el 1er premio: ${pct(d.prob_primero)} (1 de cada 100);
       con los 3 números, ${pct(3 * d.prob_primero)}.</p>
@@ -773,9 +801,9 @@ async function vistaIndicadas(fecha) {
   $("#vista").innerHTML = `
     <section class="heroe">
       <div>
-        <div class="eyebrow">✦ Libro de Rosita · Libro oculto</div>
+        <div class="eyebrow">✦ Libro de Rosita · Libro oculto · Master</div>
         <h2>Loterías indicadas</h2>
-        <div class="sub">${esc(fechaLarga(d.fecha))} · los números en que más coinciden el día, la fecha, los que repiten y las secuencias</div>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · los números en que más coinciden el día, la fecha, los que repiten, las secuencias y el Master</div>
         <div class="nav-fecha">
           <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
           <input type="date" id="fecha" value="${esc(d.fecha)}">
@@ -816,22 +844,32 @@ async function vistaIndicadas(fecha) {
 // -------------------------------------------------------- los 7 más fuertes
 
 function tarjetaFuerte(l) {
-  const aciertos = l.numeros.filter((x) => x.acierto).length;
+  const aciertos = l.numeros.filter((x) => x.acierto).length + l.numeros.filter((x) => x.acierto_inverso).length;
   const estado = !l.resultado ? `<span class="sello oro">Pendiente</span>`
     : aciertos ? `<span class="sello acierto">✓ ${plural(aciertos, "acierto", "aciertos")}</span>`
     : `<span class="sello">Sin aciertos</span>`;
-  const elegidos = new Set(l.numeros.map((x) => x.numero));
+  const elegidos = new Set(l.numeros.flatMap((x) => x.inverso ? [x.numero, x.inverso] : [x.numero]));
   return `<article class="rec${aciertos ? " gano" : ""}">
     <div class="rec-cab">
       <div><a class="nombre" href="${enlaceLoteria(l.nombre)}">${esc(l.nombre)}</a><div class="grupo">${esc(l.etiqueta)}</div></div>
       ${estado}
     </div>
-    <div class="siete">${l.numeros.map((x) => `<span class="chip"
-        title="${esc(`${x.numero}: salió ${x.veces} veces (${x.primero} de 1er premio), ${x.vs_azar.toFixed(2)}x lo normal. Última vez hace ${plural(x.hace, "día", "días")}.`)}">
-      <span class="bola ${claseJugada(x)}">${esc(x.numero)}</span><small>${x.veces} veces</small></span>`).join("")}</div>
+    <div class="siete">${l.numeros.map((x, i) => `<div class="pareja"
+        title="${esc((x.inverso ? `${x.numero} y ${x.inverso} cuentan como uno: ${x.veces} veces (${x.detalle.join(" + ")})`
+          : `${x.numero} es su propio inverso: ${x.veces} veces`) +
+          `, ${x.primero} de 1er premio, ${x.vs_azar.toFixed(2)}x lo normal. Última vez hace ${plural(x.hace, "día", "días")}.`)}">
+      <span class="pos">${ROMANOS[i]}</span>
+      <span class="par"><span class="bola ${claseJugada(x)}">${esc(x.numero)}</span>${x.inverso
+        ? `<span class="bola chica ${claseJugada({ acierto: x.acierto_inverso })}">${esc(x.inverso)}</span>` : ""}</span>
+      <span class="datos"><b>${x.veces} veces</b>${x.master ? `<span class="master">★ Master</span>` : ""}
+        <small>${plural(x.primero, "vez", "veces")} de 1er premio · hace ${plural(x.hace, "día", "días")}</small></span>
+      <span class="f1"><b>${(x.fuerza_primera * 100).toFixed(1)} %</b><small>fuerza en 1ra (normal ${(x.normal_primera * 100).toFixed(0)} %)</small>
+        <span class="peso"><span style="width:${Math.min(100, 50 * x.fuerza_primera / x.normal_primera)}%"></span></span></span>
+    </div>`).join("")}</div>
+    <div class="jugadas-ind"><div>★ Fila Master del ${esc(l.master.numero)} ${bolas(l.master.fila, "chica")}</div></div>
     <div class="rec-pie">${l.resultado
       ? `Salió <div class="bolas">${l.resultado.map((n) => bolaChica(n, elegidos.has(n))).join("")}</div>`
-      : `${l.sorteos} sorteos contados desde el ${esc(fechaMini(l.desde))} · lo normal sería ${l.esperado.toFixed(1)} veces cada número`}</div>
+      : `${l.sorteos} sorteos contados desde el ${esc(fechaMini(l.desde))} · lo normal sería ${l.esperado.toFixed(1)} veces cada número (${(2 * l.esperado).toFixed(1)} cada pareja)`}</div>
   </article>`;
 }
 
@@ -844,7 +882,7 @@ async function vistaFuertes(fecha) {
       <div>
         <div class="eyebrow">✦ Cálculo de ${d.años} años</div>
         <h2>Los ${d.cuantos} más fuertes</h2>
-        <div class="sub">${esc(fechaLarga(d.fecha))} · los ${d.cuantos} números que más han salido en cada lotería indicada</div>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · las ${d.cuantos} parejas número-inverso que más han salido en cada lotería indicada</div>
         <div class="nav-fecha">
           <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
           <input type="date" id="fecha" value="${esc(d.fecha)}">
@@ -862,12 +900,18 @@ async function vistaFuertes(fecha) {
         ${d.completo ? "" : `<div class="aviso">Solo hay resultados guardados desde el ${esc(fechaLarga(d.desde))}
           (${meses} meses). La página de donde salen no tiene sorteos más antiguos; el cálculo irá cubriendo
           los ${d.años} años a medida que se guarden.</div>`}
+        <p class="nota">Un número y su inverso cuentan como si fueran el mismo: si el 15 salió 20 veces y el 51 salió 30,
+          la pareja suma 50. Todas las cifras son de la pareja. La bola grande es el que más ha salido; la pequeña, su inverso.</p>
+        <p class="nota"><b>Fuerza en 1ra</b>: de todos los sorteos, en qué porcentaje la pareja salió de 1er premio.
+          Lo normal es 2 % (1 % si el número es doble); la raya de la barrita marca lo normal.</p>
+        <p class="nota">Los marcados con ★ están en la fila del libro Master para el último 1er premio:
+          en caso de empate van primero.</p>
         <p class="nota">Pasa el dedo o el ratón por cada número para ver cuántas veces salió de 1er premio
           y hace cuánto salió por última vez.</p>
       </div>
     </section>
 
-    <h3 class="titulo">Por lotería <small>${d.cuantos} números · de más a menos salidos</small></h3>
+    <h3 class="titulo">Por lotería <small>${d.cuantos} parejas con su inverso · de más a menos salidas</small></h3>
     ${d.loterias.length ? `<div class="recs">${d.loterias.map(tarjetaFuerte).join("")}</div>`
       : `<div class="vacio panel">No hay datos de estas loterías.</div>`}
 
@@ -877,8 +921,9 @@ async function vistaFuertes(fecha) {
         <div class="kpi"><b>${p.aciertos}</b><span>números acertados de ${p.jugados} jugados · el azar daría ${p.esperado.toFixed(0)}</span></div>
         <div class="kpi"><b>${p.con_acierto}</b><span>de ${p.sorteos} sorteos con al menos un acierto</span></div>
       </div>
-      <p class="nota">Antes de cada sorteo se eligieron los ${d.cuantos} más salidos con lo que había hasta ese día.
-        Jugando ${d.cuantos} números, la probabilidad real de acertar al menos uno en un sorteo es
+      <p class="nota">Antes de cada sorteo se eligieron las ${d.cuantos} parejas más salidas con lo que había hasta ese día,
+        jugando el número y su inverso (unos ${(p.jugados / Math.max(p.sorteos, 1)).toFixed(0)} números por sorteo).
+        Con esa cantidad de números, la probabilidad real de acertar al menos uno en un sorteo es
         ${(p.prob_alguno * 100).toFixed(0)} %, sean los que sean. Z = ${p.z.toFixed(1)} (entre −2 y +2 es suerte normal).</p>
     </div>`;
 
@@ -886,6 +931,95 @@ async function vistaFuertes(fecha) {
   $("#sig").onclick = () => ir(`fuertes/${d.siguiente}`);
   $("#fecha").onchange = (e) => e.target.value && ir(`fuertes/${e.target.value}`);
   if ($("#hoy")) $("#hoy").onclick = () => ir("fuertes");
+}
+
+// ------------------------------------------------------------------- Master
+
+function tarjetaMaster(l) {
+  const aciertos = l.ranking.filter((x) => x.acierto).length;
+  const estado = !l.resultado ? `<span class="sello oro">Pendiente</span>`
+    : aciertos ? `<span class="sello acierto">✓ ${plural(aciertos, "acierto", "aciertos")}</span>`
+    : `<span class="sello">Sin aciertos</span>`;
+  const fila = new Set(l.ranking.map((x) => x.numero));
+  return `<article class="rec${aciertos ? " gano" : ""}">
+    <div class="rec-cab">
+      <div><a class="nombre" href="${enlaceLoteria(l.nombre)}">${esc(l.etiqueta)}</a><div class="grupo">${esc(l.nombre)}</div></div>
+      ${estado}
+    </div>
+    <div class="ranking">${l.ranking.map((x, i) => `<div class="puesto">
+      <span class="pos">${ROMANOS[i]}</span>
+      <span class="bola ${claseJugada(x)}">${esc(x.numero)}</span>
+      <span class="d">En seguimiento: salió ${x.acerto} de ${plural(x.sugerido, "vez", "veces")}.
+        En total salió ${plural(x.veces, "vez", "veces")} aquí${x.hace !== null ? `, la última hace ${plural(x.hace, "día", "días")}` : ""}.</span>
+      <span class="v">${(x.probabilidad * 100).toFixed(1)} %</span>
+    </div>`).join("")}</div>
+    <div class="rec-pie">${l.resultado
+      ? `Salió <div class="bolas">${l.resultado.map((n) => bolaChica(n, fila.has(n))).join("")}</div>`
+      : `Calculado con ${l.sorteos} sorteos de esta lotería`}</div>
+  </article>`;
+}
+
+async function vistaMaster(fecha) {
+  const d = await api(`/api/master${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  const p = d.prueba, h = p.historial, n = d.nacional;
+  const kpi = (m, texto) => `<div class="kpi"><b>${m.aciertos}<small style="font-size:14px;color:var(--tenue)"> / ${m.jugados}</small></b>
+    <span>${texto} · el azar daría ${m.esperado.toFixed(1)} (${m.jugados ? m.vs_azar.toFixed(2) + "x" : "—"}, Z = ${m.z.toFixed(1)})</span></div>`;
+  $("#vista").innerHTML = `
+    <section class="heroe">
+      <div>
+        <div class="eyebrow">✦ Libro Master KA · Capítulo 12</div>
+        <h2>Master</h2>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · el 1er premio de la Nacional Noche y su fila, seguida en Gana Más, Real Día, Loteka Noche y Leidsa</div>
+        <div class="nav-fecha">
+          <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
+          <input type="date" id="fecha" value="${esc(d.fecha)}">
+          <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
+          ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
+        </div>
+        <div class="cifras">
+          <div class="cifra"><b>${d.loterias.length}</b><span>loterías en seguimiento</span></div>
+          <div class="cifra"><b>${d.loterias.filter((l) => l.resultado).length}<small> / ${d.loterias.length}</small></b><span>ya sorteadas</span></div>
+          <div class="cifra oro"><b>${h.aciertos}<small> / ${h.jugados}</small></b><span>veces que salió alguno de la fila</span></div>
+          <div class="cifra"><b>${h.jugados ? h.vs_azar.toFixed(2) + "x" : "—"}</b><span>vs azar (esperado ${h.esperado.toFixed(0)})</span></div>
+        </div>
+      </div>
+      ${n.numero ? `<div class="vision">
+        <span class="etiqueta">Nacional Noche · ${esc(fechaMini(n.fecha))}</span>
+        <div class="grande"><span class="bola primero">${esc(n.numero)}</span></div>
+        <span class="etiqueta">Su fila en el libro</span>
+        <div class="grande">${bolas(n.fila, "oro")}</div>
+        <p class="nota">Solo estos 4 números se siguen hoy.</p>
+      </div>` : `<div class="vision"><span class="etiqueta">Nacional Noche</span>
+        <p class="nota">Todavía no está el 1er premio de la Nacional Noche del ${esc(fechaLarga(n.fecha))}.
+          Pulsa Actualizar cuando haya salido.</p></div>`}
+    </section>
+
+    <h3 class="titulo">Seguimiento <small>los 4 números de la fila, ordenados por probabilidad en cada lotería</small></h3>
+    ${d.loterias.length ? `<div class="recs">${d.loterias.map(tarjetaMaster).join("")}</div>
+      <p class="nota" style="margin-top:12px">La probabilidad junta cuánto sale ese número en esa lotería con cuántas veces
+        salió cuando el libro lo mandó a seguir; con pocos datos se acerca al azar (2,97 % por número).
+        Que salga alguno de los 4 en una lotería: ${((1 - (1 - 0.0297) ** 4) * 100).toFixed(1)} % por azar;
+        en al menos una de las ${d.loterias.length}: ${(d.en_alguna * 100).toFixed(0)} %.</p>`
+      : `<div class="vacio panel">No hay seguimiento para este día.</div>`}
+
+    <h3 class="titulo">¿Cómo le ha ido al seguimiento? <small>sin ver el resultado antes de jugar</small></h3>
+    <div class="panel">
+      <div class="kpis">
+        ${kpi(h, "veces que salió alguno de los 4, en todo el historial")}
+        ${kpi(p.cuatro, `lo mismo, en los últimos ${d.dias_prueba} días`)}
+        ${kpi(p.uno, `el número I del ranking salió (últimos ${d.dias_prueba} días)`)}
+      </div>
+      <p class="nota">${h.z >= 3 ? "La fila del libro acierta claramente más que el azar (Z de 3 o más)."
+        : h.z >= 2 ? "La fila del libro acierta algo más que el azar, pero aún no es concluyente: con Z menor de 3 puede ser suerte."
+        : h.z <= -2 ? "La fila del libro acierta menos que el azar."
+        : "La fila del libro acierta como el azar: la diferencia cabe dentro de la suerte normal (Z entre −2 y +2)."}
+        Se actualiza sola cada día; un patrón real se mantendría con los sorteos nuevos.</p>
+    </div>`;
+
+  $("#ant").onclick = () => ir(`master/${d.anterior}`);
+  $("#sig").onclick = () => ir(`master/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`master/${e.target.value}`);
+  if ($("#hoy")) $("#hoy").onclick = () => ir("master");
 }
 
 // ------------------------------------------------------------ vista por día

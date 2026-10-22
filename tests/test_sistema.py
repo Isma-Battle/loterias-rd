@@ -88,8 +88,10 @@ class TestIndicadas(unittest.TestCase):
         a = indicadas.analizar(Contexto("Quiniela Leidsa", date(2026, 10, 19), [ultimo], [ultimo]))
         self.assertEqual(a.fuentes["Rosita · repite"], ["50", "05", "01"])
         self.assertIn("50", a.fuentes["Libro oculto"])
-        # 2 fuentes cada uno: 01 (00 repite como 01 + 10v del libro), 50 y 88 (día + libro)
-        self.assertEqual({j.numero for j in a.jugadas[:3]}, {"01", "50", "88"})
+        self.assertEqual(a.fuentes["Master"], ["02", "07", "52", "57"])  # el 05 señala la fila del 02
+        # 2 fuentes cada uno: 01 (00 repite como 01 + 10v del libro), 07 (Master + día),
+        # 50 y 88 (día + libro)
+        self.assertEqual({j.numero for j in a.jugadas[:4]}, {"01", "07", "50", "88"})
         self.assertEqual(a.jugadas[0].votos, 2)
 
     def test_primer_premio_solo_mira_el_primero(self):
@@ -98,7 +100,8 @@ class TestIndicadas(unittest.TestCase):
         a = indicadas.primer_premio(Contexto("Quiniela Leidsa", date(2026, 10, 19), [ultimo], [ultimo]))
         self.assertEqual(a.fuentes["Rosita · repite"], ["50", "05"])
         self.assertEqual(a.fuentes["Libro oculto"], ["50"])
-        self.assertEqual((a.jugadas[0].numero, a.jugadas[0].votos), ("50", 2))
+        # 07 (Master + volteo del 70 del lunes) y 50 (repite + libro) empatan con 2 fuentes
+        self.assertEqual([(j.numero, j.votos) for j in a.jugadas[:2]], [("07", 2), ("50", 2)])
 
 
 class TestFuertes(unittest.TestCase):
@@ -114,9 +117,34 @@ class TestFuertes(unittest.TestCase):
         d = web.fuertes(con, date(2026, 1, 11))
         nums = d["loterias"][0]["numeros"]
         self.assertEqual(len(nums), 7)
-        self.assertEqual([n["numero"] for n in nums[:2]], ["07", "45"])  # 10 veces cada uno
-        self.assertNotIn("99", [n["numero"] for n in nums])               # el resultado del día no cuenta
+        self.assertEqual([(n["numero"], n["inverso"]) for n in nums[:2]], [("07", "70"), ("45", "54")])
+        # 01 y 10 salieron una vez cada uno: como pareja suman 2 y pasan delante de los demás
+        self.assertEqual((nums[2]["numero"], nums[2]["inverso"], nums[2]["veces"]), ("10", "01", 2))
+        # 07 sale 11 veces (el día 7 sale dos veces: 07-45-07) y 70 ninguna: la pareja suma 11
+        self.assertEqual((nums[0]["veces"], nums[0]["detalle"], nums[0]["primero"]), (11, [11, 0], 10))
+        self.assertEqual(nums[0]["fuerza_primera"], 1.0)  # 07 fue 1er premio en los 10 sorteos
+        todos = {x for n in nums for x in (n["numero"], n["inverso"])}
+        self.assertNotIn("99", todos)  # el resultado del día no cuenta
         self.assertEqual(d["loterias"][0]["resultado"], ["99", "98", "97"])
+
+
+class TestMaster(unittest.TestCase):
+    def test_libro(self):
+        from loterias.reglas import master
+        self.assertEqual(len(master.LIBRO), 100)
+        self.assertEqual(master.LIBRO["01"], ["10", "15", "60", "65"])  # el ejemplo del capítulo 12
+        self.assertEqual(master.LIBRO["95"], ["44", "49", "94", "99"])
+
+    def test_seguimiento_solo_la_fila_de_la_nacional(self):
+        from loterias.reglas import master
+        # La Nacional Noche saca 01 cada noche; al día siguiente Gana Más saca el 15
+        nacional = {date(2026, 1, d): "01" for d in range(1, 11)}
+        h = [Sorteo("Gana Más", "Nacional", date(2026, 1, d), ("15", "33", "44")) for d in range(2, 11)]
+        fila = master.LIBRO[master.disparo(nacional, date(2026, 1, 11))]
+        r = master.seguimiento(fila, nacional, h, date(2026, 1, 11))
+        self.assertEqual(sorted(x.numero for x in r), ["10", "15", "60", "65"])  # ningún otro número
+        self.assertEqual((r[0].numero, r[0].sugerido, r[0].acerto), ("15", 9, 9))
+        self.assertGreater(r[0].probabilidad, r[1].probabilidad)
 
 
 if __name__ == "__main__":

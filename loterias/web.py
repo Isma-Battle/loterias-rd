@@ -11,7 +11,9 @@ y pide los datos a estas rutas (todas devuelven JSON):
     GET  /api/recomendaciones?fecha=...  números recomendados por las reglas para ese día
          (&loteria=... para una sola)
     GET  /api/indicadas?fecha=...        loterías indicadas según el Libro de Rosita y el Libro oculto
-    GET  /api/fuertes?fecha=...          los 7 números que más han salido en 3 años en cada indicada
+    GET  /api/fuertes?fecha=...          las 7 parejas número-inverso que más han salido en 3 años en cada indicada
+    GET  /api/master?fecha=...           la fila del libro Master KA para el 1er premio de la Nacional Noche,
+                                         seguida en Gana Más, Real Día, Loteka Noche y Leidsa
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
@@ -32,6 +34,7 @@ from . import db, motor, recolector
 from .reglas import TODAS as REGLAS
 from .reglas import Contexto
 from .reglas import indicadas as libro
+from .reglas import master as libro_master
 
 PAGINA = Path(__file__).resolve().parent / "web" / "index.html"
 
@@ -346,9 +349,28 @@ AÑOS_FUERTES = 3
 CUANTOS_FUERTES = 7
 
 
-def _top(veces: Counter, ultima: dict[str, date]) -> list[str]:
-    """Los más salidos; en empate, el que salió más recientemente."""
-    return sorted(veces, key=lambda n: (-veces[n], -ultima[n].toordinal(), n))[:CUANTOS_FUERTES]
+def _top(veces: Counter, ultima: dict[str, date], master: list[str]) -> list[tuple[str, str]]:
+    """Las parejas número-inverso más salidas (23 cuenta junto con 32), como (principal, inverso).
+
+    La fuerza de la pareja es la suma de los dos; en empate van primero las que tienen algún
+    número en la fila Master y luego la que salió más recientemente. El principal es el
+    que más salió de los dos. En 11, 22, 33... el inverso es el mismo número.
+    """
+    nunca = date.min
+    parejas = {min(n, n[::-1]) for n in veces}
+    def fuerza(k):
+        return veces[k] + (veces[k[::-1]] if k != k[::-1] else 0)
+    def reciente(k):
+        return max(ultima.get(k, nunca), ultima.get(k[::-1], nunca))
+    elegidas = sorted(parejas, key=lambda k: (-fuerza(k), k not in master and k[::-1] not in master,
+                                              -reciente(k).toordinal(), k))[:CUANTOS_FUERTES]
+    salida = []
+    for k in elegidas:
+        a, b = k, k[::-1]
+        if (veces[b], ultima.get(b, nunca)) > (veces[a], ultima.get(a, nunca)):
+            a, b = b, a
+        salida.append((a, b))
+    return salida
 
 
 def fuertes(con, fecha: date) -> dict | None:
@@ -365,7 +387,7 @@ def fuertes(con, fecha: date) -> dict | None:
     veces: dict[str, Counter] = defaultdict(Counter)
     primero: dict[str, Counter] = defaultdict(Counter)
     ultima: dict[str, dict[str, date]] = defaultdict(dict)
-    sorteos = aciertos = con_acierto = 0
+    sorteos = jugados = aciertos = con_acierto = 0
     reales: dict[str, db.Sorteo] = {}
     for s in todos:
         if s.fecha == fecha:
@@ -377,9 +399,11 @@ def fuertes(con, fecha: date) -> dict | None:
             veces[s.loteria].subtract(viejo.numeros)
             primero[s.loteria][viejo.numeros[0]] -= 1
         if s.fecha >= prueba_desde and len(v) >= 30:
-            elegidos = _top(+veces[s.loteria], ultima[s.loteria])
+            elegidos = {n for par in _top(+veces[s.loteria], ultima[s.loteria],
+                                          libro_master.LIBRO[v[-1].numeros[0]]) for n in par}
             sorteos += 1
-            ac = len(set(elegidos) & set(s.numeros))
+            jugados += len(elegidos)
+            ac = len(elegidos & set(s.numeros))
             aciertos += ac
             con_acierto += ac > 0
         v.append(s)
@@ -396,6 +420,7 @@ def fuertes(con, fecha: date) -> dict | None:
         real = reales.get(nombre)
         salidos = set(real.numeros) if real else None
         cuenta = +veces[nombre]
+        fila = libro_master.LIBRO[v[-1].numeros[0]]
         esperado = len(v) * motor.PROB_AZAR
         tarjetas.append({
             "etiqueta": etiqueta,
@@ -403,15 +428,24 @@ def fuertes(con, fecha: date) -> dict | None:
             "sorteos": len(v),
             "desde": v[0].fecha.isoformat(),
             "esperado": round(esperado, 1),
-            "numeros": [{"numero": n, "veces": cuenta[n], "primero": primero[nombre][n],
-                         "vs_azar": round(cuenta[n] / esperado, 2),
-                         "hace": (fecha - ultima[nombre][n]).days,
-                         "acierto": _salio(salidos, [n])}
-                        for n in _top(cuenta, ultima[nombre])],
+            # Número e inverso cuentan como uno solo: todas las cifras son de la pareja
+            "numeros": [{"numero": n, "inverso": inv if inv != n else None,
+                         "veces": sum(cuenta[x] for x in {n, inv}),
+                         "primero": sum(primero[nombre][x] for x in {n, inv}),
+                         # Fuerza: % de sorteos en que la pareja salió de 1er premio (lo normal: 1 % por número)
+                         "fuerza_primera": round(sum(primero[nombre][x] for x in {n, inv}) / len(v), 4),
+                         "normal_primera": 0.01 * len({n, inv}),
+                         "detalle": [cuenta[n], cuenta[inv]] if inv != n else [cuenta[n]],
+                         "vs_azar": round(sum(cuenta[x] for x in {n, inv}) / (esperado * len({n, inv})), 2),
+                         "hace": min((fecha - ultima[nombre][x]).days for x in (n, inv) if x in ultima[nombre]),
+                         "master": n in fila or inv in fila,
+                         "acierto": _salio(salidos, [n]),
+                         "acierto_inverso": _salio(salidos, [inv]) if inv != n else None}
+                        for n, inv in _top(cuenta, ultima[nombre], fila)],
+            "master": {"numero": v[-1].numeros[0], "fila": fila},
             "resultado": list(real.numeros) if real else None,
         })
 
-    jugados = sorteos * CUANTOS_FUERTES
     esperado = jugados * motor.PROB_AZAR
     var = jugados * motor.PROB_AZAR * (1 - motor.PROB_AZAR)
     primer_dia = todos[0].fecha
@@ -430,8 +464,87 @@ def fuertes(con, fecha: date) -> dict | None:
             "esperado": round(esperado, 1),
             "vs_azar": round(aciertos / esperado, 3) if esperado else 0,
             "z": round((aciertos - esperado) / var ** .5, 2) if var else 0,
-            "prob_alguno": round(1 - (1 - motor.PROB_AZAR) ** CUANTOS_FUERTES, 4),
+            "prob_alguno": round(1 - (1 - motor.PROB_AZAR) ** (jugados / sorteos), 4) if sorteos else 0,
         },
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
+# ------------------------------------------------------------------- Master
+
+def _medir(aciertos: int, jugados: int, prob: float) -> dict:
+    esperado = jugados * prob
+    var = jugados * prob * (1 - prob)
+    return {"aciertos": aciertos, "jugados": jugados, "esperado": round(esperado, 1),
+            "vs_azar": round(aciertos / esperado, 3) if esperado else 0,
+            "z": round((aciertos - esperado) / var ** .5, 2) if var else 0}
+
+
+def master(con, fecha: date) -> dict | None:
+    todos = db.cargar(con, hasta=fecha)
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
+    prueba_desde = fecha - timedelta(days=DIAS_PRUEBA)
+    nacional = {s.fecha: s.numeros[0] for s in todos
+                if s.loteria == libro_master.DISPARADOR and desde <= s.fecha < fecha}
+    por_loteria: dict[str, list[db.Sorteo]] = defaultdict(list)
+    for s in todos:
+        if s.loteria in libro_master.NOMBRES and s.fecha >= desde:
+            por_loteria[s.loteria].append(s)
+
+    numero = libro_master.disparo(nacional, fecha)
+    fila = libro_master.LIBRO[numero] if numero else []
+    tarjetas = []
+    medidas = {"cuatro": [0, 0], "uno": [0, 0], "historial": [0, 0]}  # [aciertos, sorteos]
+    for etiqueta, nombre in libro_master.DESTINOS:
+        sorteos = por_loteria.get(nombre, [])
+        h = [s for s in sorteos if s.fecha < fecha]
+        real = next((s for s in sorteos if s.fecha == fecha), None)
+        # Cómo le fue: cada día con Nacional Noche la noche anterior, sin ver el resultado
+        for i, s in enumerate(h):
+            t = libro_master.disparo(nacional, s.fecha)
+            if t is None:
+                continue
+            f = libro_master.LIBRO[t]
+            medidas["historial"][0] += bool(set(f) & set(s.numeros))
+            medidas["historial"][1] += 1
+            if s.fecha >= prueba_desde:
+                orden = libro_master.seguimiento(f, nacional, h[:i], s.fecha)
+                medidas["cuatro"][0] += bool(set(f) & set(s.numeros))
+                medidas["uno"][0] += orden[0].numero in s.numeros
+                medidas["cuatro"][1] += 1
+                medidas["uno"][1] += 1
+        if not fila or not h:
+            continue
+        salidos = set(real.numeros) if real else None
+        tarjetas.append({
+            "etiqueta": etiqueta,
+            "nombre": nombre,
+            "ranking": [{"numero": x.numero, "veces": x.veces, "sugerido": x.sugerido, "acerto": x.acerto,
+                         "hace": x.hace, "probabilidad": round(x.probabilidad, 4),
+                         "acierto": _salio(salidos, [x.numero])}
+                        for x in libro_master.seguimiento(fila, nacional, h, fecha)],
+            "sorteos": len(h),
+            "resultado": list(real.numeros) if real else None,
+        })
+
+    p, primer_dia = motor.PROB_AZAR, todos[0].fecha
+    p4 = 1 - (1 - p) ** 4
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "nacional": {"numero": numero, "fecha": (fecha - timedelta(days=1)).isoformat(), "fila": fila},
+        "loterias": tarjetas,
+        "prueba": {
+            "historial": _medir(*medidas["historial"], p4),
+            "cuatro": _medir(*medidas["cuatro"], p4),
+            "uno": _medir(*medidas["uno"], p),
+        },
+        "en_alguna": round(1 - (1 - p4) ** len(libro_master.DESTINOS), 4),
         "dias_prueba": DIAS_PRUEBA,
     }
 
@@ -523,6 +636,15 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     except ValueError:
                         fecha = datetime.now(recolector.ZONA_RD).date()
                     datos = fuertes(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/master":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = master(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)
