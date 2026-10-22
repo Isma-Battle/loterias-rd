@@ -289,6 +289,10 @@
   .jugadas-ind > div { display: flex; gap: 8px; align-items: center; }
   .jugadas-ind .bolas { gap: 4px; }
   .secuencia b { color: var(--oro); font-weight: 600; }
+  .siete { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .siete .chip { flex-direction: column; gap: 4px; }
+  .siete .bola { min-width: 0; width: 100%; max-width: 44px; height: 40px; }
+  .siete small { font-size: 11px; color: var(--tenue); font-variant-numeric: tabular-nums; }
   .maestra.gano { border-color: rgba(56, 226, 160, .45); box-shadow: 0 0 30px rgba(56, 226, 160, .1); }
   .lista-senales .nota { margin-top: 4px; }
 
@@ -350,6 +354,7 @@
     <nav>
       <a href="#oraculo" id="tab-oraculo">El Oráculo</a>
       <a href="#indicadas" id="tab-indicadas">Loterías indicadas</a>
+      <a href="#fuertes" id="tab-fuertes">Los 7 más fuertes</a>
       <a href="#dia" id="tab-dia">Resultados</a>
       <a href="#loteria" id="tab-loteria">Por lotería</a>
     </nav>
@@ -424,15 +429,16 @@ function ir(hash) { location.hash = hash; }
 
 async function mostrar() {
   const [vistaHash, ...resto] = location.hash.slice(1).split("/");
-  const vista = ["indicadas", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
+  const vista = ["indicadas", "fuertes", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
   const param = decodeURIComponent(resto.join("/"));
-  for (const v of ["oraculo", "indicadas", "dia", "loteria"])
+  for (const v of ["oraculo", "indicadas", "fuertes", "dia", "loteria"])
     $(`#tab-${v}`).classList.toggle("activo", v === vista);
   try {
     if (!resumen) await cargarResumen();
     if (!resumen.total) { $("#vista").innerHTML = sinDatos(); return; }
     if (vista === "loteria") await vistaLoteria(param);
     else if (vista === "indicadas") await vistaIndicadas(param);
+    else if (vista === "fuertes") await vistaFuertes(param);
     else if (vista === "dia") await vistaDia(param || resumen.hasta);
     else await vistaOraculo(param);
   } catch (e) {
@@ -805,6 +811,81 @@ async function vistaIndicadas(fecha) {
   $("#sig").onclick = () => ir(`indicadas/${d.siguiente}`);
   $("#fecha").onchange = (e) => e.target.value && ir(`indicadas/${e.target.value}`);
   if ($("#hoy")) $("#hoy").onclick = () => ir("indicadas");
+}
+
+// -------------------------------------------------------- los 7 más fuertes
+
+function tarjetaFuerte(l) {
+  const aciertos = l.numeros.filter((x) => x.acierto).length;
+  const estado = !l.resultado ? `<span class="sello oro">Pendiente</span>`
+    : aciertos ? `<span class="sello acierto">✓ ${plural(aciertos, "acierto", "aciertos")}</span>`
+    : `<span class="sello">Sin aciertos</span>`;
+  const elegidos = new Set(l.numeros.map((x) => x.numero));
+  return `<article class="rec${aciertos ? " gano" : ""}">
+    <div class="rec-cab">
+      <div><a class="nombre" href="${enlaceLoteria(l.nombre)}">${esc(l.nombre)}</a><div class="grupo">${esc(l.etiqueta)}</div></div>
+      ${estado}
+    </div>
+    <div class="siete">${l.numeros.map((x) => `<span class="chip"
+        title="${esc(`${x.numero}: salió ${x.veces} veces (${x.primero} de 1er premio), ${x.vs_azar.toFixed(2)}x lo normal. Última vez hace ${plural(x.hace, "día", "días")}.`)}">
+      <span class="bola ${claseJugada(x)}">${esc(x.numero)}</span><small>${x.veces} veces</small></span>`).join("")}</div>
+    <div class="rec-pie">${l.resultado
+      ? `Salió <div class="bolas">${l.resultado.map((n) => bolaChica(n, elegidos.has(n))).join("")}</div>`
+      : `${l.sorteos} sorteos contados desde el ${esc(fechaMini(l.desde))} · lo normal sería ${l.esperado.toFixed(1)} veces cada número`}</div>
+  </article>`;
+}
+
+async function vistaFuertes(fecha) {
+  const d = await api(`/api/fuertes${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  const p = d.prueba;
+  const meses = Math.round(diasEntre(d.desde, d.fecha) / 30.4);
+  $("#vista").innerHTML = `
+    <section class="heroe">
+      <div>
+        <div class="eyebrow">✦ Cálculo de ${d.años} años</div>
+        <h2>Los ${d.cuantos} más fuertes</h2>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · los ${d.cuantos} números que más han salido en cada lotería indicada</div>
+        <div class="nav-fecha">
+          <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
+          <input type="date" id="fecha" value="${esc(d.fecha)}">
+          <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
+          ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
+        </div>
+        <div class="cifras">
+          <div class="cifra"><b>${d.loterias.length}</b><span>loterías indicadas</span></div>
+          <div class="cifra"><b>${meses}<small> meses</small></b><span>de datos (desde ${esc(fechaMini(d.desde))})</span></div>
+          <div class="cifra oro"><b>${p.aciertos}<small> / ${p.jugados}</small></b><span>aciertos en ${d.dias_prueba} días</span></div>
+          <div class="cifra"><b>${p.jugados ? p.vs_azar.toFixed(2) + "x" : "—"}</b><span>vs azar (esperado ${p.esperado.toFixed(0)})</span></div>
+        </div>
+      </div>
+      <div class="base">
+        ${d.completo ? "" : `<div class="aviso">Solo hay resultados guardados desde el ${esc(fechaLarga(d.desde))}
+          (${meses} meses). La página de donde salen no tiene sorteos más antiguos; el cálculo irá cubriendo
+          los ${d.años} años a medida que se guarden.</div>`}
+        <p class="nota">Pasa el dedo o el ratón por cada número para ver cuántas veces salió de 1er premio
+          y hace cuánto salió por última vez.</p>
+      </div>
+    </section>
+
+    <h3 class="titulo">Por lotería <small>${d.cuantos} números · de más a menos salidos</small></h3>
+    ${d.loterias.length ? `<div class="recs">${d.loterias.map(tarjetaFuerte).join("")}</div>`
+      : `<div class="vacio panel">No hay datos de estas loterías.</div>`}
+
+    <h3 class="titulo">¿Cómo le ha ido? <small>últimos ${d.dias_prueba} días, sin ver el futuro</small></h3>
+    <div class="panel">
+      <div class="kpis">
+        <div class="kpi"><b>${p.aciertos}</b><span>números acertados de ${p.jugados} jugados · el azar daría ${p.esperado.toFixed(0)}</span></div>
+        <div class="kpi"><b>${p.con_acierto}</b><span>de ${p.sorteos} sorteos con al menos un acierto</span></div>
+      </div>
+      <p class="nota">Antes de cada sorteo se eligieron los ${d.cuantos} más salidos con lo que había hasta ese día.
+        Jugando ${d.cuantos} números, la probabilidad real de acertar al menos uno en un sorteo es
+        ${(p.prob_alguno * 100).toFixed(0)} %, sean los que sean. Z = ${p.z.toFixed(1)} (entre −2 y +2 es suerte normal).</p>
+    </div>`;
+
+  $("#ant").onclick = () => ir(`fuertes/${d.anterior}`);
+  $("#sig").onclick = () => ir(`fuertes/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`fuertes/${e.target.value}`);
+  if ($("#hoy")) $("#hoy").onclick = () => ir("fuertes");
 }
 
 // ------------------------------------------------------------ vista por día

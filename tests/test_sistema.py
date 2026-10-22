@@ -101,5 +101,23 @@ class TestIndicadas(unittest.TestCase):
         self.assertEqual((a.jugadas[0].numero, a.jugadas[0].votos), ("50", 2))
 
 
+class TestFuertes(unittest.TestCase):
+    def test_los_mas_salidos_sin_contar_el_dia(self):
+        import sqlite3
+        from loterias import db, web
+        con = sqlite3.connect(":memory:")
+        con.execute("CREATE TABLE sorteos (loteria TEXT, grupo TEXT, fecha TEXT, numeros TEXT)")
+        datos = [Sorteo("Quiniela Leidsa", "Leidsa", date(2026, 1, d), ("07", "45", f"{d:02d}"))
+                 for d in range(1, 11)]
+        datos.append(Sorteo("Quiniela Leidsa", "Leidsa", date(2026, 1, 11), ("99", "98", "97")))
+        db.guardar(con, datos)
+        d = web.fuertes(con, date(2026, 1, 11))
+        nums = d["loterias"][0]["numeros"]
+        self.assertEqual(len(nums), 7)
+        self.assertEqual([n["numero"] for n in nums[:2]], ["07", "45"])  # 10 veces cada uno
+        self.assertNotIn("99", [n["numero"] for n in nums])               # el resultado del día no cuenta
+        self.assertEqual(d["loterias"][0]["resultado"], ["99", "98", "97"])
+
+
 if __name__ == "__main__":
     unittest.main()

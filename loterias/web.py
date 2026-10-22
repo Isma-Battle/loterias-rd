@@ -11,6 +11,7 @@ y pide los datos a estas rutas (todas devuelven JSON):
     GET  /api/recomendaciones?fecha=...  números recomendados por las reglas para ese día
          (&loteria=... para una sola)
     GET  /api/indicadas?fecha=...        loterías indicadas según el Libro de Rosita y el Libro oculto
+    GET  /api/fuertes?fecha=...          los 7 números que más han salido en 3 años en cada indicada
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
@@ -339,6 +340,102 @@ def indicadas(con, fecha: date) -> dict | None:
     }
 
 
+# ------------------------------------------------------------ los 7 más fuertes
+
+AÑOS_FUERTES = 3
+CUANTOS_FUERTES = 7
+
+
+def _top(veces: Counter, ultima: dict[str, date]) -> list[str]:
+    """Los más salidos; en empate, el que salió más recientemente."""
+    return sorted(veces, key=lambda n: (-veces[n], -ultima[n].toordinal(), n))[:CUANTOS_FUERTES]
+
+
+def fuertes(con, fecha: date) -> dict | None:
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in libro.NOMBRES]
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
+    prueba_desde = fecha - timedelta(days=DIAS_PRUEBA)
+
+    # Se recorre en orden: antes de cada sorteo de la prueba se eligen los 7 con lo que
+    # había hasta ese momento, así la prueba nunca ve el resultado que juega.
+    ventana: dict[str, list[db.Sorteo]] = defaultdict(list)
+    veces: dict[str, Counter] = defaultdict(Counter)
+    primero: dict[str, Counter] = defaultdict(Counter)
+    ultima: dict[str, dict[str, date]] = defaultdict(dict)
+    sorteos = aciertos = con_acierto = 0
+    reales: dict[str, db.Sorteo] = {}
+    for s in todos:
+        if s.fecha == fecha:
+            reales[s.loteria] = s
+            continue
+        v = ventana[s.loteria]
+        while v and v[0].fecha < s.fecha - timedelta(days=365 * AÑOS_FUERTES):
+            viejo = v.pop(0)
+            veces[s.loteria].subtract(viejo.numeros)
+            primero[s.loteria][viejo.numeros[0]] -= 1
+        if s.fecha >= prueba_desde and len(v) >= 30:
+            elegidos = _top(+veces[s.loteria], ultima[s.loteria])
+            sorteos += 1
+            ac = len(set(elegidos) & set(s.numeros))
+            aciertos += ac
+            con_acierto += ac > 0
+        v.append(s)
+        veces[s.loteria].update(s.numeros)
+        primero[s.loteria][s.numeros[0]] += 1
+        for n in s.numeros:
+            ultima[s.loteria][n] = s.fecha
+
+    tarjetas = []
+    for etiqueta, nombre in libro.INDICADAS:
+        v = [x for x in ventana.get(nombre, []) if x.fecha >= desde]
+        if not v:
+            continue
+        real = reales.get(nombre)
+        salidos = set(real.numeros) if real else None
+        cuenta = +veces[nombre]
+        esperado = len(v) * motor.PROB_AZAR
+        tarjetas.append({
+            "etiqueta": etiqueta,
+            "nombre": nombre,
+            "sorteos": len(v),
+            "desde": v[0].fecha.isoformat(),
+            "esperado": round(esperado, 1),
+            "numeros": [{"numero": n, "veces": cuenta[n], "primero": primero[nombre][n],
+                         "vs_azar": round(cuenta[n] / esperado, 2),
+                         "hace": (fecha - ultima[nombre][n]).days,
+                         "acierto": _salio(salidos, [n])}
+                        for n in _top(cuenta, ultima[nombre])],
+            "resultado": list(real.numeros) if real else None,
+        })
+
+    jugados = sorteos * CUANTOS_FUERTES
+    esperado = jugados * motor.PROB_AZAR
+    var = jugados * motor.PROB_AZAR * (1 - motor.PROB_AZAR)
+    primer_dia = todos[0].fecha
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "años": AÑOS_FUERTES,
+        "cuantos": CUANTOS_FUERTES,
+        "desde": max(desde, primer_dia).isoformat(),
+        "completo": primer_dia <= desde,
+        "loterias": tarjetas,
+        "prueba": {
+            "sorteos": sorteos, "jugados": jugados, "aciertos": aciertos, "con_acierto": con_acierto,
+            "esperado": round(esperado, 1),
+            "vs_azar": round(aciertos / esperado, 3) if esperado else 0,
+            "z": round((aciertos - esperado) / var ** .5, 2) if var else 0,
+            "prob_alguno": round(1 - (1 - motor.PROB_AZAR) ** CUANTOS_FUERTES, 4),
+        },
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
 _descargando = threading.Lock()
 
 
@@ -417,6 +514,15 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     except ValueError:
                         fecha = datetime.now(recolector.ZONA_RD).date()
                     datos = indicadas(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/fuertes":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = fuertes(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)
