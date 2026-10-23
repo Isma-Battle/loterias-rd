@@ -882,7 +882,7 @@ async function vistaFuertes(fecha) {
       <div>
         <div class="eyebrow">✦ Cálculo de ${d.años} años</div>
         <h2>Los ${d.cuantos} más fuertes</h2>
-        <div class="sub">${esc(fechaLarga(d.fecha))} · las ${d.cuantos} parejas número-inverso que más han salido en cada lotería indicada</div>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · las ${d.cuantos} parejas número-inverso que más han salido en cada lotería indicada, Real Noche, Loteka y King Lottery</div>
         <div class="nav-fecha">
           <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
           <input type="date" id="fecha" value="${esc(d.fecha)}">
@@ -890,7 +890,7 @@ async function vistaFuertes(fecha) {
           ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
         </div>
         <div class="cifras">
-          <div class="cifra"><b>${d.loterias.length}</b><span>loterías indicadas</span></div>
+          <div class="cifra"><b>${d.loterias.length}</b><span>loterías</span></div>
           <div class="cifra"><b>${meses}<small> meses</small></b><span>de datos (desde ${esc(fechaMini(d.desde))})</span></div>
           <div class="cifra oro"><b>${p.aciertos}<small> / ${p.jugados}</small></b><span>aciertos en ${d.dias_prueba} días</span></div>
           <div class="cifra"><b>${p.jugados ? p.vs_azar.toFixed(2) + "x" : "—"}</b><span>vs azar (esperado ${p.esperado.toFixed(0)})</span></div>

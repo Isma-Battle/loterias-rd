@@ -11,7 +11,8 @@ y pide los datos a estas rutas (todas devuelven JSON):
     GET  /api/recomendaciones?fecha=...  números recomendados por las reglas para ese día
          (&loteria=... para una sola)
     GET  /api/indicadas?fecha=...        loterías indicadas según el Libro de Rosita y el Libro oculto
-    GET  /api/fuertes?fecha=...          las 7 parejas número-inverso que más han salido en 3 años en cada indicada
+    GET  /api/fuertes?fecha=...          las 7 parejas número-inverso que más han salido en 3 años en cada indicada,
+                                         más Real Noche, Loteka y King Lottery (Día y Noche)
     GET  /api/master?fecha=...           la fila del libro Master KA para el 1er premio de la Nacional Noche,
                                          seguida en Gana Más, Real Día, Loteka Noche y Leidsa
     POST /api/actualizar                 descarga los resultados de hoy y ayer
@@ -347,6 +348,13 @@ def indicadas(con, fecha: date) -> dict | None:
 
 AÑOS_FUERTES = 3
 CUANTOS_FUERTES = 7
+# Las indicadas y, además, estas (como se muestra, nombre en la base de datos)
+LOTERIAS_FUERTES = libro.INDICADAS + [
+    ("Real Noche", "Lotería Real Noche"),
+    ("Loteka Día", "Quiniela Loteka Día"), ("Loteka Noche", "Quiniela Loteka Noche"),
+    ("King Lottery Día", "King Lottery Día"), ("King Lottery Noche", "King Lottery Noche"),
+]
+NOMBRES_FUERTES = [n for _, n in LOTERIAS_FUERTES]
 
 
 def _top(veces: Counter, ultima: dict[str, date], master: list[str]) -> list[tuple[str, str]]:
@@ -374,7 +382,7 @@ def _top(veces: Counter, ultima: dict[str, date], master: list[str]) -> list[tup
 
 
 def fuertes(con, fecha: date) -> dict | None:
-    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in libro.NOMBRES]
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
     if not todos:
         return None
     hoy = datetime.now(recolector.ZONA_RD).date()
@@ -413,7 +421,7 @@ def fuertes(con, fecha: date) -> dict | None:
             ultima[s.loteria][n] = s.fecha
 
     tarjetas = []
-    for etiqueta, nombre in libro.INDICADAS:
+    for etiqueta, nombre in LOTERIAS_FUERTES:
         v = [x for x in ventana.get(nombre, []) if x.fecha >= desde]
         if not v:
             continue
