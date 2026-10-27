@@ -382,6 +382,8 @@
       <a href="#indicadas" id="tab-indicadas">Loterías indicadas</a>
       <a href="#fuertes" id="tab-fuertes">Los 7 más fuertes</a>
       <a href="#master" id="tab-master">Master</a>
+      <a href="#king" id="tab-king">Master King</a>
+      <a href="#raya" id="tab-raya">3 en raya</a>
       <a href="#dia" id="tab-dia">Resultados</a>
       <a href="#loteria" id="tab-loteria">Por lotería</a>
     </nav>
@@ -456,9 +458,9 @@ function ir(hash) { location.hash = hash; }
 
 async function mostrar() {
   const [vistaHash, ...resto] = location.hash.slice(1).split("/");
-  const vista = ["indicadas", "fuertes", "master", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
+  const vista = ["indicadas", "fuertes", "master", "king", "raya", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
   const param = decodeURIComponent(resto.join("/"));
-  for (const v of ["oraculo", "indicadas", "fuertes", "master", "dia", "loteria"])
+  for (const v of ["oraculo", "indicadas", "fuertes", "master", "king", "raya", "dia", "loteria"])
     $(`#tab-${v}`).classList.toggle("activo", v === vista);
   try {
     if (!resumen) await cargarResumen();
@@ -467,6 +469,8 @@ async function mostrar() {
     else if (vista === "indicadas") await vistaIndicadas(param);
     else if (vista === "fuertes") await vistaFuertes(param);
     else if (vista === "master") await vistaMaster(param);
+    else if (vista === "king") await vistaKing(param);
+    else if (vista === "raya") await vistaRaya(param);
     else if (vista === "dia") await vistaDia(param || resumen.hasta);
     else await vistaOraculo(param);
   } catch (e) {
@@ -931,6 +935,183 @@ async function vistaFuertes(fecha) {
   $("#sig").onclick = () => ir(`fuertes/${d.siguiente}`);
   $("#fecha").onchange = (e) => e.target.value && ir(`fuertes/${e.target.value}`);
   if ($("#hoy")) $("#hoy").onclick = () => ir("fuertes");
+}
+
+// -------------------------------------------------------------- Master King
+
+function tarjetaKing(l, d) {
+  const maximo = d.cuantos + d.puntos_master;
+  const aciertos = l.numeros.filter((x) => x.acierto).length + l.numeros.filter((x) => x.acierto_inverso).length;
+  const estado = !l.resultado ? `<span class="sello oro">Pendiente</span>`
+    : aciertos ? `<span class="sello acierto">✓ ${plural(aciertos, "acierto", "aciertos")}</span>`
+    : `<span class="sello">Sin aciertos</span>`;
+  const elegidos = new Set(l.numeros.flatMap((x) => x.inverso ? [x.numero, x.inverso] : [x.numero]));
+  return `<article class="rec${aciertos ? " gano" : ""}">
+    <div class="rec-cab">
+      <div><a class="nombre" href="${enlaceLoteria(l.nombre)}">${esc(l.nombre)}</a><div class="grupo">${esc(l.etiqueta)}</div></div>
+      ${estado}
+    </div>
+    <div class="siete">${l.numeros.map((x, i) => `<div class="pareja">
+      <span class="pos">${ROMANOS[i]}</span>
+      <span class="par"><span class="bola ${claseJugada(x)}">${esc(x.numero)}</span>${x.inverso
+        ? `<span class="bola chica ${claseJugada({ acierto: x.acierto_inverso })}">${esc(x.inverso)}</span>` : ""}</span>
+      <span class="datos"><b>${x.puesto ? `Fuerte ${ROMANOS[x.puesto - 1]}` : "Solo Master"}</b>${x.master ? `<span class="master">★ Master</span>` : ""}
+        <small>${plural(x.veces, "vez", "veces")} · ${x.hace === null ? "nunca ha salido" : `hace ${plural(x.hace, "día", "días")}`}</small></span>
+      <span class="f1"><b>${plural(x.puntos, "punto", "puntos")}</b><small>${x.puesto ? `${8 - x.puesto} por fuerza` : ""}${x.puesto && x.master ? " + " : ""}${x.master ? `${d.puntos_master} por Master` : ""}</small>
+        <span class="peso"><span style="width:${Math.min(100, 100 * x.puntos / maximo)}%"></span></span></span>
+    </div>`).join("")}</div>
+    <div class="rec-pie">${l.resultado
+      ? `Salió <div class="bolas">${l.resultado.map((n) => bolaChica(n, elegidos.has(n))).join("")}</div>`
+      : `Calculado con ${l.sorteos} sorteos de esta lotería`}</div>
+  </article>`;
+}
+
+async function vistaKing(fecha) {
+  const d = await api(`/api/king${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  const p = d.prueba, n = d.nacional;
+  $("#vista").innerHTML = `
+    <section class="heroe">
+      <div>
+        <div class="eyebrow">✦ Los ${d.cuantos} más fuertes + Master</div>
+        <h2>Master King</h2>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · las ${d.cuantos} parejas con más puntos: por ser de las más salidas y por estar en la fila Master de la Nacional Noche</div>
+        <div class="nav-fecha">
+          <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
+          <input type="date" id="fecha" value="${esc(d.fecha)}">
+          <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
+          ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
+        </div>
+        <div class="cifras">
+          <div class="cifra"><b>${d.loterias.length}</b><span>loterías</span></div>
+          <div class="cifra"><b>${d.loterias.filter((l) => l.resultado).length}<small> / ${d.loterias.length}</small></b><span>ya sorteadas</span></div>
+          <div class="cifra oro"><b>${p.aciertos}<small> / ${p.jugados}</small></b><span>aciertos en ${d.dias_prueba} días</span></div>
+          <div class="cifra"><b>${p.jugados ? p.vs_azar.toFixed(2) + "x" : "—"}</b><span>vs azar (esperado ${p.esperado.toFixed(0)})</span></div>
+        </div>
+      </div>
+      ${n.numero ? `<div class="vision">
+        <span class="etiqueta">Nacional Noche · ${esc(fechaMini(n.fecha))}</span>
+        <div class="grande"><span class="bola primero">${esc(n.numero)}</span></div>
+        <span class="etiqueta">Su fila en el libro</span>
+        <div class="grande">${bolas(n.fila, "oro")}</div>
+        <p class="nota">Estos 4 (con su inverso) suman ${d.puntos_master} puntos en todas las loterías.</p>
+      </div>` : `<div class="vision"><span class="etiqueta">Nacional Noche</span>
+        <p class="nota">Todavía no está el 1er premio de la Nacional Noche del ${esc(fechaLarga(n.fecha))}.
+          Mientras tanto se juegan solo los ${d.cuantos} más fuertes. Pulsa Actualizar cuando haya salido.</p></div>`}
+    </section>
+
+    <div class="panel">
+      <p class="nota"><b>Cómo se cuentan los puntos.</b> Cada pareja de los ${d.cuantos} más fuertes gana puntos por su puesto:
+        el I gana ${d.cuantos}, el II ${d.cuantos - 1}… y el VII 1. Si la pareja tiene un número de la fila Master gana
+        ${d.puntos_master} más. Se juegan las ${d.cuantos} parejas con más puntos; en empate, la que más ha salido.
+        Así, un número de la fila que no está entre los fuertes entra detrás del IV y delante del V.</p>
+    </div>
+
+    <h3 class="titulo">Por lotería <small>${d.cuantos} parejas con su inverso · de más a menos puntos</small></h3>
+    ${d.loterias.length ? `<div class="recs">${d.loterias.map((l) => tarjetaKing(l, d)).join("")}</div>`
+      : `<div class="vacio panel">No hay datos de estas loterías.</div>`}
+
+    <h3 class="titulo">¿Cómo le ha ido? <small>últimos ${d.dias_prueba} días, sin ver el futuro</small></h3>
+    <div class="panel">
+      <div class="kpis">
+        <div class="kpi"><b>${p.aciertos}</b><span>números acertados de ${p.jugados} jugados · el azar daría ${p.esperado.toFixed(0)}</span></div>
+        <div class="kpi"><b>${p.con_acierto}</b><span>de ${p.sorteos} sorteos con al menos un acierto</span></div>
+      </div>
+      <p class="nota">Antes de cada sorteo se sumaron los puntos con lo que había hasta ese día y la Nacional Noche de la noche
+        anterior, jugando el número y su inverso (unos ${(p.jugados / Math.max(p.sorteos, 1)).toFixed(0)} números por sorteo).
+        Con esa cantidad de números, la probabilidad real de acertar al menos uno en un sorteo es
+        ${(p.prob_alguno * 100).toFixed(0)} %, sean los que sean. Z = ${p.z.toFixed(1)} (entre −2 y +2 es suerte normal).</p>
+    </div>`;
+
+  $("#ant").onclick = () => ir(`king/${d.anterior}`);
+  $("#sig").onclick = () => ir(`king/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`king/${e.target.value}`);
+  if ($("#hoy")) $("#hoy").onclick = () => ir("king");
+}
+
+// --------------------------------------------------------------- 3 en raya
+
+async function vistaRaya(fecha) {
+  const d = await api(`/api/raya${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  const p = d.prueba;
+  const maximo = Math.max(1, ...d.numeros.map((x) => x.despues));
+  const elegidos = new Set(d.numeros.flatMap((x) => x.inverso ? [x.numero, x.inverso] : [x.numero]));
+  const aciertos = d.resultados.reduce((s, r) => s + r.aciertos, 0);
+  const sello = (x) => !d.sorteadas ? "" : x.donde.length
+    ? `<span class="master">✓ ${x.donde.map(esc).join(", ")}</span>` : "";
+  $("#vista").innerHTML = `
+    <section class="heroe">
+      <div>
+        <div class="eyebrow">✦ Capítulo 05 del Máster Ka</div>
+        <h2>3 en raya</h2>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · las ${d.cuantos} parejas más fuertes de los campos que abrieron
+          las ${d.total} loterías, con su inverso</div>
+        <div class="nav-fecha">
+          <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
+          <input type="date" id="fecha" value="${esc(d.fecha)}">
+          <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
+          ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
+        </div>
+        <div class="cifras">
+          <div class="cifra"><b>${d.total}</b><span>loterías</span></div>
+          <div class="cifra"><b>${d.sorteadas}<small> / ${d.total}</small></b><span>ya sorteadas</span></div>
+          <div class="cifra oro"><b>${p.aciertos}<small> / ${p.jugados}</small></b><span>aciertos en ${d.dias_prueba} días</span></div>
+          <div class="cifra"><b>${p.jugados ? p.vs_azar.toFixed(2) + "x" : "—"}</b><span>vs azar (esperado ${p.esperado.toFixed(0)})</span></div>
+        </div>
+      </div>
+      <div class="vision">
+        <span class="etiqueta">La jugada</span>
+        <div class="grande">${bolas([...elegidos], "oro")}</div>
+        <p class="nota">${d.sorteadas ? `${plural(aciertos, "acierto", "aciertos")} en las ${d.sorteadas} loterías ya sorteadas.`
+          : "Se juega en cualquiera de las loterías."}</p>
+      </div>
+    </section>
+
+    <div class="panel">
+      <p class="nota"><b>Cómo funciona.</b> Cada campo del libro empieza por un número y le siguen otros (00-81-49-25).
+        Los números del último sorteo de cada lotería abren su campo. De todos los que le siguen, cada uno con su inverso
+        (81 y 18), se juegan las ${d.cuantos} parejas que más veces salieron, sumando todas las loterías, en el sorteo
+        siguiente a uno donde salió el primer número del campo (en los últimos ${d.años} años). En empate, la que más
+        ha salido en total.</p>
+    </div>
+
+    <h3 class="titulo">Los ${d.cuantos} más fuertes <small>en todas las loterías juntas</small></h3>
+    ${d.numeros.length ? `<div class="panel"><div class="siete">${d.numeros.map((x, i) => `<div class="pareja">
+      <span class="pos">${ROMANOS[i]}</span>
+      <span class="par"><span class="bola ${x.donde.length ? "acierto" : ""}">${esc(x.numero)}</span>${x.inverso
+        ? `<span class="bola chica">${esc(x.inverso)}</span>` : ""}</span>
+      <span class="datos"><b>Campo del ${x.campos.map(esc).join(", ")}</b>${sello(x)}
+        <small>${plural(x.veces, "vez", "veces")} en total · ${x.hace === null ? "nunca ha salido" : `hace ${plural(x.hace, "día", "días")}`}</small></span>
+      <span class="f1"><b>${x.despues}</b><small>veces detrás</small>
+        <span class="peso"><span style="width:${100 * x.despues / maximo}%"></span></span></span>
+    </div>`).join("")}</div></div>` : `<div class="vacio panel">Ningún último sorteo abrió un campo del libro.</div>`}
+
+    ${d.resultados.length ? `<h3 class="titulo">Resultados del día <small>en verde, los de la jugada</small></h3>
+    <div class="panel"><div class="siete">${d.resultados.map((r) => `<div class="jugadas-ind">
+      <div><a href="${enlaceLoteria(r.nombre)}">${esc(r.nombre)}</a>
+        <div class="bolas">${r.numeros.map((n) => bolaChica(n, elegidos.has(n))).join("")}</div></div></div>`).join("")}</div></div>` : ""}
+
+    <h3 class="titulo">Campos abiertos <small>por el último sorteo de cada lotería</small></h3>
+    <div class="panel"><div class="siete">${d.abiertos.map((l) => `<div class="jugadas-ind">
+      <div><a href="${enlaceLoteria(l.nombre)}">${esc(l.nombre)}</a> · ${esc(fechaMini(l.fecha))} ${bolas(l.numeros, "chica")}</div>
+      ${l.campos.map((c) => `<div>${esc(c.primero)} → ${bolas(c.siguen, "chica")}</div>`).join("")
+        || `<div>no abre ningún campo</div>`}</div>`).join("")}</div></div>
+
+    <h3 class="titulo">¿Cómo le ha ido? <small>últimos ${d.dias_prueba} días, sin ver el futuro</small></h3>
+    <div class="panel">
+      <div class="kpis">
+        <div class="kpi"><b>${p.aciertos}</b><span>números acertados de ${p.jugados} jugados · el azar daría ${p.esperado.toFixed(0)}</span></div>
+        <div class="kpi"><b>${p.con_acierto}</b><span>de ${p.sorteos} sorteos con al menos un acierto</span></div>
+      </div>
+      <p class="nota">Cada día se armó la jugada con lo que había hasta el día anterior y se jugó en todas las loterías
+        (unos ${(p.jugados / Math.max(p.sorteos, 1)).toFixed(0)} números por sorteo). Con esa cantidad de números, la
+        probabilidad real de acertar al menos uno en un sorteo es ${(p.prob_alguno * 100).toFixed(0)} %, sean los que sean.
+        Z = ${p.z.toFixed(1)} (entre −2 y +2 es suerte normal).</p>
+    </div>`;
+
+  $("#ant").onclick = () => ir(`raya/${d.anterior}`);
+  $("#sig").onclick = () => ir(`raya/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`raya/${e.target.value}`);
+  if ($("#hoy")) $("#hoy").onclick = () => ir("raya");
 }
 
 // ------------------------------------------------------------------- Master

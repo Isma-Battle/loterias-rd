@@ -15,6 +15,10 @@ y pide los datos a estas rutas (todas devuelven JSON):
                                          más Real Noche, Loteka, King Lottery y Florida (Día y Noche)
     GET  /api/master?fecha=...           la fila del libro Master KA para el 1er premio de la Nacional Noche,
                                          seguida en Gana Más, Real Día, Loteka Noche y Leidsa
+    GET  /api/king?fecha=...             Master King: los 7 más fuertes y la fila Master de la Nacional Noche,
+                                         mezclados por puntos
+    GET  /api/raya?fecha=...             3 en raya: los campos del capítulo 05 del Máster Ka que abre el último
+                                         sorteo, en las mismas loterías que los 7 más fuertes
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
@@ -26,6 +30,7 @@ import threading
 import time
 import webbrowser
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -36,6 +41,7 @@ from .reglas import TODAS as REGLAS
 from .reglas import Contexto
 from .reglas import indicadas as libro
 from .reglas import master as libro_master
+from .reglas import raya as libro_raya
 
 PAGINA = Path(__file__).resolve().parent / "web" / "index.html"
 
@@ -382,44 +388,69 @@ def _top(veces: Counter, ultima: dict[str, date], master: list[str]) -> list[tup
     return salida
 
 
-def fuertes(con, fecha: date) -> dict | None:
-    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
-    if not todos:
-        return None
-    hoy = datetime.now(recolector.ZONA_RD).date()
-    desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
-    prueba_desde = fecha - timedelta(days=DIAS_PRUEBA)
+@dataclass
+class _Recorrido:
+    ventana: dict[str, list[db.Sorteo]]     # sorteos de los últimos AÑOS_FUERTES años, por lotería
+    veces: dict[str, Counter]
+    primero: dict[str, Counter]             # veces de 1er premio
+    ultima: dict[str, dict[str, date]]      # última vez que salió cada número
+    reales: dict[str, db.Sorteo]            # resultado del día, si ya salió
+    prueba: dict
 
-    # Se recorre en orden: antes de cada sorteo de la prueba se eligen los 7 con lo que
-    # había hasta ese momento, así la prueba nunca ve el resultado que juega.
-    ventana: dict[str, list[db.Sorteo]] = defaultdict(list)
-    veces: dict[str, Counter] = defaultdict(Counter)
-    primero: dict[str, Counter] = defaultdict(Counter)
-    ultima: dict[str, dict[str, date]] = defaultdict(dict)
+
+def _recorrer(todos: list[db.Sorteo], fecha: date, elegir) -> _Recorrido:
+    """Recorre los sorteos en orden contando los últimos AÑOS_FUERTES años de cada lotería.
+
+    Antes de cada sorteo de los DIAS_PRUEBA anteriores a `fecha` juega los números que da
+    `elegir(sorteo, ventana, veces, ultima)` con lo que había hasta ese momento, así la
+    prueba nunca ve el resultado que juega. El resultado de `fecha` no se cuenta.
+    """
+    prueba_desde = fecha - timedelta(days=DIAS_PRUEBA)
+    r = _Recorrido(defaultdict(list), defaultdict(Counter), defaultdict(Counter), defaultdict(dict), {}, {})
     sorteos = jugados = aciertos = con_acierto = 0
-    reales: dict[str, db.Sorteo] = {}
     for s in todos:
         if s.fecha == fecha:
-            reales[s.loteria] = s
+            r.reales[s.loteria] = s
             continue
-        v = ventana[s.loteria]
+        v = r.ventana[s.loteria]
         while v and v[0].fecha < s.fecha - timedelta(days=365 * AÑOS_FUERTES):
             viejo = v.pop(0)
-            veces[s.loteria].subtract(viejo.numeros)
-            primero[s.loteria][viejo.numeros[0]] -= 1
+            r.veces[s.loteria].subtract(viejo.numeros)
+            r.primero[s.loteria][viejo.numeros[0]] -= 1
         if s.fecha >= prueba_desde and len(v) >= 30:
-            elegidos = {n for par in _top(+veces[s.loteria], ultima[s.loteria],
-                                          libro_master.LIBRO[v[-1].numeros[0]]) for n in par}
+            elegidos = elegir(s, v, +r.veces[s.loteria], r.ultima[s.loteria])
             sorteos += 1
             jugados += len(elegidos)
             ac = len(elegidos & set(s.numeros))
             aciertos += ac
             con_acierto += ac > 0
         v.append(s)
-        veces[s.loteria].update(s.numeros)
-        primero[s.loteria][s.numeros[0]] += 1
+        r.veces[s.loteria].update(s.numeros)
+        r.primero[s.loteria][s.numeros[0]] += 1
         for n in s.numeros:
-            ultima[s.loteria][n] = s.fecha
+            r.ultima[s.loteria][n] = s.fecha
+
+    esperado = jugados * motor.PROB_AZAR
+    var = jugados * motor.PROB_AZAR * (1 - motor.PROB_AZAR)
+    r.prueba = {
+        "sorteos": sorteos, "jugados": jugados, "aciertos": aciertos, "con_acierto": con_acierto,
+        "esperado": round(esperado, 1),
+        "vs_azar": round(aciertos / esperado, 3) if esperado else 0,
+        "z": round((aciertos - esperado) / var ** .5, 2) if var else 0,
+        "prob_alguno": round(1 - (1 - motor.PROB_AZAR) ** (jugados / sorteos), 4) if sorteos else 0,
+    }
+    return r
+
+
+def fuertes(con, fecha: date) -> dict | None:
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
+    r = _recorrer(todos, fecha, lambda s, v, veces, ultima: {
+        n for par in _top(veces, ultima, libro_master.LIBRO[v[-1].numeros[0]]) for n in par})
+    ventana, veces, primero, ultima, reales = r.ventana, r.veces, r.primero, r.ultima, r.reales
 
     tarjetas = []
     for etiqueta, nombre in LOTERIAS_FUERTES:
@@ -455,8 +486,6 @@ def fuertes(con, fecha: date) -> dict | None:
             "resultado": list(real.numeros) if real else None,
         })
 
-    esperado = jugados * motor.PROB_AZAR
-    var = jugados * motor.PROB_AZAR * (1 - motor.PROB_AZAR)
     primer_dia = todos[0].fecha
     return {
         "fecha": fecha.isoformat(),
@@ -468,16 +497,188 @@ def fuertes(con, fecha: date) -> dict | None:
         "desde": max(desde, primer_dia).isoformat(),
         "completo": primer_dia <= desde,
         "loterias": tarjetas,
-        "prueba": {
-            "sorteos": sorteos, "jugados": jugados, "aciertos": aciertos, "con_acierto": con_acierto,
-            "esperado": round(esperado, 1),
-            "vs_azar": round(aciertos / esperado, 3) if esperado else 0,
-            "z": round((aciertos - esperado) / var ** .5, 2) if var else 0,
-            "prob_alguno": round(1 - (1 - motor.PROB_AZAR) ** (jugados / sorteos), 4) if sorteos else 0,
-        },
+        "prueba": r.prueba,
         "dias_prueba": DIAS_PRUEBA,
     }
 
+
+# --------------------------------------------------------------- Master King
+
+PUNTOS_MASTER = 4
+
+
+def _king(veces: Counter, ultima: dict[str, date], fila: list[str]) -> list[dict]:
+    """Los 7 más fuertes mezclados con la fila Master de la Nacional Noche, por puntos.
+
+    Cada pareja número-inverso de los 7 más fuertes suma puntos por su puesto (I = 7 ... VII = 1)
+    y la que tiene un número de la fila suma PUNTOS_MASTER más. Se juegan las 7 con más puntos;
+    en empate, la que más ha salido. Así una de la fila que no está entre los fuertes queda
+    detrás del IV y delante del V.
+    """
+    puntos: dict[str, int] = {}
+    puesto: dict[str, int] = {}
+    par: dict[str, tuple[str, str]] = {}
+    for i, (a, b) in enumerate(_top(veces, ultima, fila)):
+        k = min(a, b)
+        puntos[k], puesto[k], par[k] = CUANTOS_FUERTES - i, i + 1, (a, b)
+    en_fila = {min(n, n[::-1]) for n in fila}
+    for n in fila:
+        k = min(n, n[::-1])
+        par.setdefault(k, (n, n[::-1]))  # de la fila: la bola grande es el número del libro
+    for k in en_fila:
+        puntos[k] = puntos.get(k, 0) + PUNTOS_MASTER
+
+    def fuerza(k):
+        return veces[k] + (veces[k[::-1]] if k != k[::-1] else 0)
+    elegidas = sorted(puntos, key=lambda k: (-puntos[k], -fuerza(k), k))[:CUANTOS_FUERTES]
+    return [{"numero": par[k][0], "inverso": par[k][1], "puntos": puntos[k],
+             "puesto": puesto.get(k), "master": k in en_fila} for k in elegidas]
+
+
+def master_king(con, fecha: date) -> dict | None:
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
+    nacional = {s.fecha: s.numeros[0] for s in todos if s.loteria == libro_master.DISPARADOR and s.fecha < fecha}
+
+    def fila_de(dia: date) -> list[str]:
+        numero = libro_master.disparo(nacional, dia)
+        return libro_master.LIBRO[numero] if numero else []
+
+    r = _recorrer(todos, fecha, lambda s, v, veces, ultima: {
+        n for x in _king(veces, ultima, fila_de(s.fecha)) for n in (x["numero"], x["inverso"])})
+    fila = fila_de(fecha)
+
+    tarjetas = []
+    for etiqueta, nombre in LOTERIAS_FUERTES:
+        v = [x for x in r.ventana.get(nombre, []) if x.fecha >= desde]
+        if not v:
+            continue
+        real = r.reales.get(nombre)
+        salidos = set(real.numeros) if real else None
+        cuenta, ultima = +r.veces[nombre], r.ultima[nombre]
+        numeros = []
+        for x in _king(cuenta, ultima, fila):
+            n, inv = x["numero"], x["inverso"]
+            vistos = [(fecha - ultima[y]).days for y in (n, inv) if y in ultima]
+            numeros.append({**x, "inverso": inv if inv != n else None,
+                            "veces": sum(cuenta[y] for y in {n, inv}),
+                            "hace": min(vistos) if vistos else None,
+                            "acierto": _salio(salidos, [n]),
+                            "acierto_inverso": _salio(salidos, [inv]) if inv != n else None})
+        tarjetas.append({
+            "etiqueta": etiqueta,
+            "nombre": nombre,
+            "sorteos": len(v),
+            "numeros": numeros,
+            "resultado": list(real.numeros) if real else None,
+        })
+
+    primer_dia = todos[0].fecha
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "nacional": {"numero": libro_master.disparo(nacional, fecha),
+                     "fecha": (fecha - timedelta(days=1)).isoformat(), "fila": fila},
+        "cuantos": CUANTOS_FUERTES,
+        "puntos_master": PUNTOS_MASTER,
+        "años": AÑOS_FUERTES,
+        "desde": max(desde, primer_dia).isoformat(),
+        "loterias": tarjetas,
+        "prueba": r.prueba,
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
+# ------------------------------------------------------------------ 3 en raya
+
+def _raya(todos: list[db.Sorteo], dia: date) -> tuple[dict[str, list[db.Sorteo]], Counter, list[dict]]:
+    """La jugada de 3 en raya para `dia`, con los sorteos de los AÑOS_FUERTES años anteriores."""
+    desde = dia - timedelta(days=365 * AÑOS_FUERTES)
+    historiales: dict[str, list[db.Sorteo]] = defaultdict(list)
+    for s in todos:
+        if desde <= s.fecha < dia:
+            historiales[s.loteria].append(s)
+    historiales = {n: h for n, h in historiales.items() if (dia - h[-1].fecha).days <= DIAS_INACTIVA}
+    veces = Counter(n for h in historiales.values() for s in h for n in s.numeros)
+    return historiales, veces, libro_raya.jugar(historiales, veces)
+
+
+def tres_en_raya(con, fecha: date) -> dict | None:
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    historiales, veces, jugada = _raya(todos, fecha)
+    reales = {s.loteria: s for s in todos if s.fecha == fecha}
+    salidos = {n for s in reales.values() for n in s.numeros}
+
+    ultima: dict[str, date] = {}
+    for h in historiales.values():
+        for s in h:
+            for n in s.numeros:
+                ultima[n] = max(ultima.get(n, s.fecha), s.fecha)
+    numeros = []
+    for x in jugada:
+        n, inv = x["numero"], x["inverso"]
+        vistos = [(fecha - ultima[y]).days for y in (n, inv) if y in ultima]
+        numeros.append({**x, "inverso": inv if inv != n else None,
+                        "hace": min(vistos) if vistos else None,
+                        "donde": [s.loteria for s in reales.values() if {n, inv} & set(s.numeros)]})
+    elegidos = {y for x in jugada for y in (x["numero"], x["inverso"])}
+
+    abiertos, resultados = [], []
+    for etiqueta, nombre in LOTERIAS_FUERTES:
+        h = historiales.get(nombre)
+        if h:
+            abiertos.append({"etiqueta": etiqueta, "nombre": nombre, "fecha": h[-1].fecha.isoformat(),
+                             "numeros": list(h[-1].numeros),
+                             "campos": [{"primero": p, "siguen": libro_raya.LIBRO[p]}
+                                        for p in h[-1].numeros if p in libro_raya.LIBRO]})
+        if nombre in reales:
+            resultados.append({"etiqueta": etiqueta, "nombre": nombre, "numeros": list(reales[nombre].numeros),
+                               "aciertos": len(elegidos & set(reales[nombre].numeros))})
+
+    # Cómo le fue: cada uno de los DIAS_PRUEBA días anteriores, con lo que había hasta ese día
+    clave = (fecha, len(todos))
+    if clave not in _cache_raya:
+        sorteos = jugados = aciertos = con_acierto = 0
+        por_dia: dict[date, list[db.Sorteo]] = defaultdict(list)
+        for s in todos:
+            if fecha - timedelta(days=DIAS_PRUEBA) <= s.fecha < fecha:
+                por_dia[s.fecha].append(s)
+        for dia, del_dia in sorted(por_dia.items()):
+            jugar = {y for x in _raya(todos, dia)[2] for y in (x["numero"], x["inverso"])}
+            for s in del_dia:
+                ac = len(jugar & set(s.numeros))
+                sorteos, jugados, aciertos, con_acierto = sorteos + 1, jugados + len(jugar), aciertos + ac, con_acierto + (ac > 0)
+        p = motor.PROB_AZAR
+        _cache_raya[clave] = {**_medir(aciertos, jugados, p), "sorteos": sorteos, "con_acierto": con_acierto,
+                              "prob_alguno": round(1 - (1 - p) ** (jugados / sorteos), 4) if sorteos else 0}
+
+    primer_dia = todos[0].fecha
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "cuantos": libro_raya.CUANTOS,
+        "años": AÑOS_FUERTES,
+        "numeros": numeros,
+        "abiertos": abiertos,
+        "resultados": resultados,
+        "sorteadas": len(resultados),
+        "total": len(historiales),
+        "prueba": _cache_raya[clave],
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
+_cache_raya: dict = {}
 
 # ------------------------------------------------------------------- Master
 
@@ -645,6 +846,24 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     except ValueError:
                         fecha = datetime.now(recolector.ZONA_RD).date()
                     datos = fuertes(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/king":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = master_king(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/raya":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = tres_en_raya(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)

@@ -128,6 +128,46 @@ class TestFuertes(unittest.TestCase):
         self.assertEqual(d["loterias"][0]["resultado"], ["99", "98", "97"])
 
 
+class TestMasterKing(unittest.TestCase):
+    def test_puntos(self):
+        from collections import Counter
+        from loterias import web
+        # 7 parejas fuertes con fuerza 10, 9 ... 4; el 99 casi no sale
+        veces = Counter({f"{i}{i + 1}": 10 - i for i in range(7)} | {"99": 1})
+        fila = ["01", "06", "51", "56"]  # 01 es el I de los fuertes (pareja 01-10)
+        k = web._king(veces, {}, fila)
+        self.assertEqual(len(k), 7)
+        self.assertEqual((k[0]["numero"], k[0]["puntos"], k[0]["puesto"], k[0]["master"]), ("01", 11, 1, True))
+        # 56 es el VI de los fuertes y está en la fila: 2 + 4. Las de la fila que no son fuertes
+        # (4 puntos) entran detrás del IV; el V (45) y el VII (67) se quedan fuera
+        self.assertEqual([(x["numero"], x["puntos"]) for x in k[1:]],
+                         [("12", 6), ("56", 6), ("23", 5), ("34", 4), ("06", 4), ("51", 4)])
+
+
+class TestTresEnRaya(unittest.TestCase):
+    def test_libro(self):
+        from loterias.reglas import raya
+        self.assertEqual(raya.LIBRO["00"], ["81", "49", "25"])
+        self.assertEqual(raya.LIBRO["93"], ["39", "37", "73"])
+        self.assertEqual(len(raya.LIBRO), 99)  # 00 a 99 sin el 20
+
+    def test_junta_todas_las_loterias(self):
+        from collections import Counter
+        from loterias.reglas import raya
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        a = [Sorteo("A", "G", d(i), n) for i, n in enumerate([("00", "33", "44"), ("52", "77", "88"),
+             ("00", "33", "44"), ("25", "77", "88"), ("00", "33", "44")], 1)]
+        b = [Sorteo("B", "G", d(i), n) for i, n in enumerate([("12", "33", "44"), ("65", "66", "88"),
+             ("12", "11", "77")], 1)]
+        historiales = {"A": a, "B": b}
+        veces = Counter(n for h in historiales.values() for s in h for n in s.numeros)
+        j = raya.jugar(historiales, veces)
+        # A abre el campo del 00 (81, 49, 25); B el del 12 (56, 66) y el del 11 (45).
+        # 25/52 salió 2 veces detrás de un 00 en A; 56/65 y 66 una vez detrás de un 12 en B
+        self.assertEqual([(x["numero"], x["inverso"], x["despues"], x["campos"]) for x in j],
+                         [("25", "52", 2, ["00"]), ("65", "56", 1, ["12"]), ("66", "66", 1, ["12"])])
+
+
 class TestMaster(unittest.TestCase):
     def test_libro(self):
         from loterias.reglas import master
