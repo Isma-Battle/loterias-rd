@@ -596,6 +596,11 @@ def master_king(con, fecha: date) -> dict | None:
 
 # ------------------------------------------------------------------ 3 en raya
 
+# 3 en raya no mira La Primera, New York ni Florida
+_FUERA_RAYA = {"La Primera Día", "Primera Noche", "New York Tarde", "New York Noche", "Florida Día", "Florida Noche"}
+LOTERIAS_RAYA = [(e, n) for e, n in LOTERIAS_FUERTES if n not in _FUERA_RAYA]
+NOMBRES_RAYA = [n for _, n in LOTERIAS_RAYA]
+
 def _raya(todos: list[db.Sorteo], dia: date) -> tuple[dict[str, list[db.Sorteo]], Counter, list[dict]]:
     """La jugada de 3 en raya para `dia`, con los sorteos de los AÑOS_FUERTES años anteriores."""
     desde = dia - timedelta(days=365 * AÑOS_FUERTES)
@@ -609,7 +614,7 @@ def _raya(todos: list[db.Sorteo], dia: date) -> tuple[dict[str, list[db.Sorteo]]
 
 
 def tres_en_raya(con, fecha: date) -> dict | None:
-    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_RAYA]
     if not todos:
         return None
     hoy = datetime.now(recolector.ZONA_RD).date()
@@ -632,7 +637,7 @@ def tres_en_raya(con, fecha: date) -> dict | None:
     elegidos = {y for x in jugada for y in (x["numero"], x["inverso"])}
 
     abiertos, resultados = [], []
-    for etiqueta, nombre in LOTERIAS_FUERTES:
+    for etiqueta, nombre in LOTERIAS_RAYA:
         h = historiales.get(nombre)
         if h:
             abiertos.append({"etiqueta": etiqueta, "nombre": nombre, "fecha": h[-1].fecha.isoformat(),
