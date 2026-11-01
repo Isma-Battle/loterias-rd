@@ -144,6 +144,58 @@ class TestMasterKing(unittest.TestCase):
                          [("12", 6), ("56", 6), ("23", 5), ("34", 4), ("06", 4), ("51", 4)])
 
 
+class TestPublicoVip(unittest.TestCase):
+    def test_prioriza_el_primer_premio(self):
+        import sqlite3
+        from loterias import db, web
+        con = sqlite3.connect(":memory:")
+        con.execute("CREATE TABLE sorteos (loteria TEXT, grupo TEXT, fecha TEXT, numeros TEXT)")
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        # 12 es 1er premio de Gana Más todos los días. En la Real, 34 lo fue los 5 primeros días y
+        # 89 los 5 últimos: el reciente pesa más. 77 sale en todos los sorteos pero nunca de 1ra.
+        datos = [Sorteo("Gana Más", "Nacional", d(i), ("12", "77", f"{i + 50:02d}")) for i in range(1, 11)]
+        datos += [Sorteo("Quiniela Real", "Loteria Real", d(i), ("34" if i <= 5 else "89", "77", f"{i + 60:02d}"))
+                  for i in range(1, 11)]
+        datos += [Sorteo("Quiniela Leidsa", "Leidsa", d(i), ("99", "99", "99")) for i in range(1, 11)]
+        datos.append(Sorteo("Gana Más", "Nacional", d(11), ("12", "00", "01")))
+        db.guardar(con, datos)
+        r = web.publico_vip(con, d(11))
+        self.assertEqual(r["sorteos"], 20)  # Leidsa no está en este método
+        self.assertEqual([(x["numero"], x["inverso"], x["primero"]) for x in r["publico"]],
+                         [("12", "21", 10), ("89", "98", 5), ("34", "43", 5)])
+        self.assertEqual(r["vip"], [])  # solo 3 parejas han salido de 1ra
+        self.assertEqual(r["publico"][0]["probabilidad"], 0.5)  # 12 fue 1ro en la mitad de los sorteos
+        self.assertEqual(r["resultados"][0]["primera"], "publico")  # el 12 salió de 1ra en Gana Más
+
+
+class TestFormula(unittest.TestCase):
+    def test_el_ejemplo(self):
+        from loterias.reglas.formula import formula
+        # 1·23·2  3·13·4  5·20·6
+        self.assertEqual(formula(("23", "13", "20")), ["12", "32", "31", "34", "52", "06"])
+
+    def test_de_la_anguila_a_donde_sale_en_primera(self):
+        import sqlite3
+        from loterias import db, web
+        con = sqlite3.connect(":memory:")
+        con.execute("CREATE TABLE sorteos (loteria TEXT, grupo TEXT, fecha TEXT, numeros TEXT)")
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        # La Anguila de las 10 saca siempre 23-13-20 (fórmula: 12 32 31 34 52 06) y ese mismo día
+        # la Quiniela Real saca el 12 de 1ra; la Nacional nunca saca nada de la fórmula
+        datos = [Sorteo("Anguila 10:00 AM", "Anguila", d(i), ("23", "13", "20")) for i in range(1, 12)]
+        datos += [Sorteo("Quiniela Real", "Loteria Real", d(i), ("12", "77", "88")) for i in range(1, 12)]
+        datos += [Sorteo("Lotería Nacional", "Nacional", d(i), ("90", "91", "93")) for i in range(1, 12)]
+        datos += [Sorteo("Quiniela Leidsa", "Leidsa", d(i), ("12", "12", "12")) for i in range(1, 12)]
+        db.guardar(con, datos)
+        r = web.la_formula(con, d(11))
+        self.assertEqual(r["origen"]["numeros"], ["23", "13", "20"])
+        self.assertEqual([x["numero"] for x in r["origen"]["formula"]], ["12", "32", "31", "34", "52", "06"])
+        real = r["destinos"][0]
+        self.assertEqual((real["nombre"], real["elegida"], real["primera"]["aciertos"]), ("Quiniela Real", True, 10))
+        self.assertTrue(real["en_primera"])  # el día 11 también salió el 12 de 1ra
+        self.assertNotIn("Quiniela Leidsa", [x["nombre"] for x in r["destinos"]])  # no está entre las 10
+
+
 class TestTresEnRaya(unittest.TestCase):
     def test_libro(self):
         from loterias.reglas import raya

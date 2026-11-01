@@ -19,6 +19,10 @@ y pide los datos a estas rutas (todas devuelven JSON):
                                          mezclados por puntos
     GET  /api/raya?fecha=...             3 en raya: los campos del capítulo 05 del Máster Ka que abre el último
                                          sorteo, en las mismas loterías que los 7 más fuertes
+    GET  /api/vip?fecha=...              Público y VIP: las 7 parejas más fuertes en 1er premio de 10 loterías
+                                         juntas; las 4 primeras son del Público y las otras 3 del VIP
+    GET  /api/formula?fecha=...          La Fórmula: 6 números de la Anguila de las 10 AM (1·23·2 -> 12 32) y en
+                                         qué loterías de ese día han salido más de 1er premio
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
@@ -41,6 +45,7 @@ from .reglas import TODAS as REGLAS
 from .reglas import Contexto
 from .reglas import indicadas as libro
 from .reglas import master as libro_master
+from .reglas import formula as libro_formula
 from .reglas import raya as libro_raya
 
 PAGINA = Path(__file__).resolve().parent / "web" / "index.html"
@@ -685,6 +690,266 @@ def tres_en_raya(con, fecha: date) -> dict | None:
 
 _cache_raya: dict = {}
 
+# ------------------------------------------------------------- Público y VIP
+
+# Los 7 más fuertes en 1ra, contando estas loterías juntas como si fueran una sola
+LOTERIAS_VIP = [
+    ("Nacional", "Lotería Nacional"), ("Gana Más", "Gana Más"),
+    ("Primera", "La Primera Día"), ("Primera", "Primera Noche"),
+    ("Nueva York", "New York Tarde"), ("Nueva York", "New York Noche"),
+    ("Suerte", "La Suerte 12:30"), ("Suerte", "La Suerte 18:00"),
+    ("Real", "Quiniela Real"), ("Loteka", "Quiniela Loteka Noche"),
+]
+NOMBRES_VIP = [n for _, n in LOTERIAS_VIP]
+CUANTOS_PUBLICO = 4  # los de más fuerza en 1ra; los otros 3 de los 7 son VIP
+VIDA_PRIMERA = 90    # días: un 1er premio de hace 90 días vale la mitad que uno de ayer
+
+
+def _vip(todos: list[db.Sorteo], dia: date) -> tuple[list[db.Sorteo], list[dict]]:
+    """Las 7 parejas número-inverso más fuertes en 1er premio para `dia`, con los sorteos de los
+    AÑOS_FUERTES años anteriores de todas las loterías juntas (los CUANTOS_PUBLICO primeros son
+    del Público).
+
+    Cada vez que la pareja salió de 1er premio suma un punto que se va gastando con el tiempo
+    (a los VIDA_PRIMERA días vale la mitad). Su probabilidad en 1ra es esa suma entre la de todos
+    los sorteos: lo que pasaría si el reciente pesa más. En empate, la que más ha salido en total.
+    """
+    desde = dia - timedelta(days=365 * AÑOS_FUERTES)
+    historiales: dict[str, list[db.Sorteo]] = defaultdict(list)
+    for s in todos:
+        if desde <= s.fecha < dia:
+            historiales[s.loteria].append(s)
+    sorteos = [s for h in historiales.values() if (dia - h[-1].fecha).days <= DIAS_INACTIVA for s in h]
+    if not sorteos:
+        return sorteos, []
+    veces = Counter(n for s in sorteos for n in s.numeros)
+    primero, peso = Counter(), Counter()
+    reciente = Counter()  # 1ros premios en los últimos VIDA_PRIMERA días
+    ultima: dict[str, date] = {}
+    ultima_1ra: dict[str, date] = {}
+    total = 0.0
+    for s in sorteos:
+        w = 0.5 ** ((dia - s.fecha).days / VIDA_PRIMERA)
+        total += w
+        n = s.numeros[0]
+        primero[n] += 1
+        peso[n] += w
+        reciente[n] += (dia - s.fecha).days <= VIDA_PRIMERA
+        ultima_1ra[n] = max(ultima_1ra.get(n, s.fecha), s.fecha)
+        for x in s.numeros:
+            ultima[x] = max(ultima.get(x, s.fecha), s.fecha)
+
+    def par(k):
+        return {k, k[::-1]}
+    fuerza = {k: sum(peso[x] for x in par(k)) for k in {min(n, n[::-1]) for n in peso}}
+    elegidas = sorted(fuerza, key=lambda k: (-fuerza[k], -sum(veces[x] for x in par(k)), k))[:CUANTOS_FUERTES]
+    parejas = []
+    for k in elegidas:
+        n, inv = k, k[::-1]
+        if (peso[inv], veces[inv]) > (peso[n], veces[n]):  # la bola grande: la que más pesa en 1ra
+            n, inv = inv, n
+        p = par(k)
+        parejas.append({"numero": n, "inverso": inv, "veces": sum(veces[x] for x in p),
+                        "detalle": [primero[n], primero[inv]] if inv != n else [primero[n]],
+                        "primero": sum(primero[x] for x in p),
+                        "reciente": sum(reciente[x] for x in p),
+                        "probabilidad": round(fuerza[k] / total, 4),
+                        "normal": 0.01 * len(p),
+                        "hace": min((dia - ultima[x]).days for x in p if x in ultima),
+                        "hace_1ra": min((dia - ultima_1ra[x]).days for x in p if x in ultima_1ra)})
+    return sorteos, parejas
+
+
+def publico_vip(con, fecha: date) -> dict | None:
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_VIP]
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    sorteos, parejas = _vip(todos, fecha)
+    reales = {s.loteria: s for s in todos if s.fecha == fecha}
+
+    def jugados(lista):
+        return {y for x in lista for y in (x["numero"], x["inverso"])}
+    publico, vip = jugados(parejas[:CUANTOS_PUBLICO]), jugados(parejas[CUANTOS_PUBLICO:])
+    numeros = []
+    for x in parejas:
+        p = {x["numero"], x["inverso"]}
+        numeros.append({**x, "inverso": x["inverso"] if x["inverso"] != x["numero"] else None,
+                        "en_primera": [s.loteria for s in reales.values() if s.numeros[0] in p],
+                        "donde": [s.loteria for s in reales.values() if p & set(s.numeros)]})
+    resultados = []
+    for e, n in LOTERIAS_VIP:
+        if n in reales:
+            nums = reales[n].numeros
+            resultados.append({"etiqueta": e, "nombre": n, "numeros": list(nums),
+                               "primera": "publico" if nums[0] in publico else "vip" if nums[0] in vip else None,
+                               "publico": len(publico & set(nums)), "vip": len(vip & set(nums))})
+
+    # Cómo le fue: cada uno de los DIAS_PRUEBA días anteriores, con lo que había hasta ese día
+    clave = (fecha, len(todos))
+    if clave not in _cache_vip:
+        por_dia: dict[date, list[db.Sorteo]] = defaultdict(list)
+        for s in todos:
+            if fecha - timedelta(days=DIAS_PRUEBA) <= s.fecha < fecha:
+                por_dia[s.fecha].append(s)
+        # [aciertos en 1ra, aciertos en cualquier premio, números jugados, sorteos con acierto]
+        cuenta = {"publico": [0, 0, 0, 0], "vip": [0, 0, 0, 0]}
+        total = 0
+        for dia, del_dia in sorted(por_dia.items()):
+            p = _vip(todos, dia)[1]
+            if not p:
+                continue
+            for parte, lista in (("publico", p[:CUANTOS_PUBLICO]), ("vip", p[CUANTOS_PUBLICO:])):
+                jugar = jugados(lista)
+                c = cuenta[parte]
+                for s in del_dia:
+                    ac = len(jugar & set(s.numeros))
+                    c[0] += s.numeros[0] in jugar
+                    c[1], c[2], c[3] = c[1] + ac, c[2] + len(jugar), c[3] + (ac > 0)
+            total += len(del_dia)
+        prob = motor.PROB_AZAR
+        _cache_vip.clear()
+        _cache_vip[clave] = {"sorteos": total, **{
+            parte: {**_medir(a, j, prob), "con_acierto": ca,
+                    "prob_alguno": round(1 - (1 - prob) ** (j / total), 4) if total else 0,
+                    # en 1ra: cada número jugado tiene 1 % de ser el 1er premio
+                    "primera": _medir(a1, j, libro.PROB_PRIMERO)}
+            for parte, (a1, a, j, ca) in cuenta.items()}}
+
+    primer_dia = todos[0].fecha
+    desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "años": AÑOS_FUERTES,
+        "cuantos": CUANTOS_FUERTES,
+        "cuantos_publico": CUANTOS_PUBLICO,
+        "vida_primera": VIDA_PRIMERA,
+        "desde": max(desde, primer_dia).isoformat(),
+        "completo": primer_dia <= desde,
+        "sorteos": len(sorteos),
+        "loterias": [{"etiqueta": e, "nombre": n} for e, n in LOTERIAS_VIP],
+        "publico": numeros[:CUANTOS_PUBLICO],
+        "vip": numeros[CUANTOS_PUBLICO:],
+        "resultados": resultados,
+        "prueba": _cache_vip[clave],
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
+_cache_vip: dict = {}
+
+# --------------------------------------------------------------- La Fórmula
+
+# Los números salen de la Anguila de las 10 de la mañana y se juegan ese mismo día en estas
+ORIGEN_FORMULA = "Anguila 10:00 AM"
+LOTERIAS_FORMULA = LOTERIAS_VIP
+NOMBRES_FORMULA = NOMBRES_VIP
+DESTINOS_FORMULA = 3  # en cuántas loterías se recomienda jugarlos
+
+
+def _cruces(todos: list[db.Sorteo]) -> list[tuple]:
+    """Para cada sorteo de las loterías destino, los 6 números de la fórmula de la Anguila de
+    las 10 de ese mismo día: (fecha, destino, ¿1ra?, aciertos, jugados)."""
+    anguila = {s.fecha: set(libro_formula.formula(s.numeros)) for s in todos if s.loteria == ORIGEN_FORMULA}
+    return [(s.fecha, s.loteria, s.numeros[0] in f, len(f & set(s.numeros)), len(f))
+            for s in todos if s.loteria in NOMBRES_FORMULA and (f := anguila.get(s.fecha))]
+
+
+def _puntaje(c: list[int]) -> float:
+    """Aciertos en 1ra frente a lo que daría el azar, con +1 arriba y abajo para que pocos
+    sorteos no manden (un acierto en 1ra de 1 sorteo no vale más que 20 de 200)."""
+    return (c[0] + 1) / (c[2] * libro.PROB_PRIMERO + 1)
+
+
+def _acumular(cuenta: dict, x: tuple):
+    c = cuenta[x[1]]  # [aciertos en 1ra, aciertos, números jugados, sorteos]
+    c[0], c[1], c[2], c[3] = c[0] + x[2], c[1] + x[3], c[2] + x[4], c[3] + 1
+
+
+def _mejores(cuenta: dict) -> list[str]:
+    return sorted(NOMBRES_FORMULA, key=lambda b: -_puntaje(cuenta[b]))[:DESTINOS_FORMULA]
+
+
+def la_formula(con, fecha: date) -> dict | None:
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FORMULA or s.loteria == ORIGEN_FORMULA]
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
+    cruces = [x for x in _cruces(todos) if x[0] >= desde]
+    etiquetas = dict((n, e) for e, n in LOTERIAS_FORMULA)
+
+    clave = (fecha, len(todos))
+    if clave not in _cache_formula:
+        # Cómo le fue: cada día de los DIAS_PRUEBA anteriores se eligieron las loterías solo con
+        # lo que había antes de ese día, y se miró si su 1er premio era de la fórmula
+        cuenta: dict = defaultdict(lambda: [0, 0, 0, 0])
+        prueba = {"elegidas": [0, 0, 0, 0], "todas": [0, 0, 0, 0]}
+        por_dia: dict[date, list[tuple]] = defaultdict(list)
+        for x in cruces:
+            if x[0] < fecha:
+                por_dia[x[0]].append(x)
+        for dia in sorted(por_dia):
+            if dia >= fecha - timedelta(days=DIAS_PRUEBA):
+                elegidas = _mejores(cuenta)
+                for x in por_dia[dia]:
+                    for parte in ["todas"] + (["elegidas"] if x[1] in elegidas else []):
+                        c = prueba[parte]
+                        c[0], c[1], c[2], c[3] = c[0] + x[2], c[1] + x[3], c[2] + x[4], c[3] + 1
+            for x in por_dia[dia]:
+                _acumular(cuenta, x)
+        _cache_formula.clear()
+        _cache_formula[clave] = {
+            parte: {"sorteos": s, "primera": _medir(a1, j, libro.PROB_PRIMERO),
+                    "cualquiera": _medir(a, j, motor.PROB_AZAR)}
+            for parte, (a1, a, j, s) in prueba.items()}
+
+    # Lo que pasó hasta el día anterior a `fecha`, para elegir las loterías de hoy
+    cuenta = defaultdict(lambda: [0, 0, 0, 0])
+    for x in cruces:
+        if x[0] < fecha:
+            _acumular(cuenta, x)
+    elegidas = _mejores(cuenta)
+
+    anguila = next((s for s in todos if s.loteria == ORIGEN_FORMULA and s.fecha == fecha), None)
+    nums = libro_formula.formula(anguila.numeros) if anguila else []
+    reales = {s.loteria: s for s in todos if s.fecha == fecha}
+    destinos = []
+    for b in sorted(NOMBRES_FORMULA, key=lambda b: -_puntaje(cuenta[b])):
+        c = cuenta[b]
+        real = reales.get(b)
+        destinos.append({"etiqueta": etiquetas[b], "nombre": b, "sorteos": c[3],
+                         "primera": _medir(c[0], c[2], libro.PROB_PRIMERO),
+                         "cualquiera": _medir(c[1], c[2], motor.PROB_AZAR),
+                         "elegida": b in elegidas,
+                         "resultado": list(real.numeros) if real and nums else None,
+                         "en_primera": real.numeros[0] in nums if real and nums else None,
+                         "aciertos": len(set(nums) & set(real.numeros)) if real and nums else None})
+
+    primer_dia = todos[0].fecha
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "desde": max(desde, primer_dia).isoformat(),
+        "cuantos": DESTINOS_FORMULA,
+        "origen": {"nombre": ORIGEN_FORMULA, "numeros": list(anguila.numeros) if anguila else None,
+                   "formula": [{"numero": n, "de": anguila.numeros[i // 2],
+                                "texto": f"{i // 2 * 2 + 1}{anguila.numeros[i // 2]}{i // 2 * 2 + 2}"}
+                               for i, n in enumerate(nums)]},
+        "destinos": destinos,
+        "dias": len({x[0] for x in cruces if x[0] < fecha}),
+        "prueba": _cache_formula[clave],
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
+_cache_formula: dict = {}
+
 # ------------------------------------------------------------------- Master
 
 def _medir(aciertos: int, jugados: int, prob: float) -> dict:
@@ -869,6 +1134,24 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     except ValueError:
                         fecha = datetime.now(recolector.ZONA_RD).date()
                     datos = tres_en_raya(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/vip":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = publico_vip(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/formula":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = la_formula(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)
