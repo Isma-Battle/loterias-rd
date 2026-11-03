@@ -1130,7 +1130,7 @@ function parejasVip(lista, desde) {
       ? `<span class="bola chica">${esc(x.inverso)}</span>` : ""}</span>
     <span class="datos"><b>${x.primero} veces en 1ra</b>${x.en_primera.length ? `<span class="master">✓ 1ra en ${x.en_primera.map(esc).join(", ")}</span>`
         : x.donde.length ? `<span class="master">salió en ${x.donde.map(esc).join(", ")}</span>` : ""}
-      <small>${x.reciente} en los últimos 90 días · último 1er premio hace ${plural(x.hace_1ra, "día", "días")} · ${x.veces} en cualquier premio</small></span>
+      <small>${x.reciente} en los últimos 7 días · último 1er premio hace ${plural(x.hace_1ra, "día", "días")} · ${x.veces} en cualquier premio</small></span>
     <span class="f1"><b>${(x.probabilidad * 100).toFixed(1)} %</b><small>probabilidad en 1ra (normal ${(x.normal * 100).toFixed(0)} %)</small>
       <span class="peso"><span style="width:${100 * x.probabilidad / maximo}%"></span></span></span>
   </div>`).join("")}</div></div>`;
@@ -1160,7 +1160,7 @@ async function vistaVip(fecha) {
           ${esc(d.loterias.map((l) => l.nombre).join(", "))}</div>
         <div class="nav-fecha">
           <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
-          <input type="date" id="fecha" value="${esc(d.fecha)}">
+          <input type="date" id="fecha" value="${esc(d.fecha)}" max="${esc(d.hoy)}">
           <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
           ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
         </div>

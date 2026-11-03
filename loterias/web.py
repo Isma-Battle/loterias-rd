@@ -702,7 +702,7 @@ LOTERIAS_VIP = [
 ]
 NOMBRES_VIP = [n for _, n in LOTERIAS_VIP]
 CUANTOS_PUBLICO = 4  # los de más fuerza en 1ra; los otros 3 de los 7 son VIP
-VIDA_PRIMERA = 90    # días: un 1er premio de hace 90 días vale la mitad que uno de ayer
+VIDA_PRIMERA = 7     # días: un 1er premio de hace 7 días vale la mitad que uno de ayer
 
 
 def _vip(todos: list[db.Sorteo], dia: date) -> tuple[list[db.Sorteo], list[dict]]:
@@ -761,10 +761,16 @@ def _vip(todos: list[db.Sorteo], dia: date) -> tuple[list[db.Sorteo], list[dict]
 
 
 def publico_vip(con, fecha: date) -> dict | None:
+    # solo se predice el día que sigue al último resultado; más allá serían los mismos números
+    ultimo = con.execute(f"SELECT MAX(fecha) FROM sorteos WHERE loteria IN ({','.join('?' * len(NOMBRES_VIP))})",
+                         NOMBRES_VIP).fetchone()[0]
+    if ultimo is None:
+        return None
+    hoy = min(datetime.now(recolector.ZONA_RD).date(), date.fromisoformat(ultimo) + timedelta(days=1))
+    fecha = min(fecha, hoy)
     todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_VIP]
     if not todos:
         return None
-    hoy = datetime.now(recolector.ZONA_RD).date()
     sorteos, parejas = _vip(todos, fecha)
     reales = {s.loteria: s for s in todos if s.fecha == fecha}
 
