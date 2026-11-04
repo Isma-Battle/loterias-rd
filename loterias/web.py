@@ -15,8 +15,8 @@ y pide los datos a estas rutas (todas devuelven JSON):
                                          más Real Noche, Loteka, King Lottery y Florida (Día y Noche)
     GET  /api/master?fecha=...           la fila del libro Master KA para el 1er premio de la Nacional Noche,
                                          seguida en Gana Más, Real Día, Loteka Noche y Leidsa
-    GET  /api/king?fecha=...             Master King: los 7 más fuertes y la fila Master de la Nacional Noche,
-                                         mezclados por puntos
+    GET  /api/king?fecha=...             Master King: el último sorteo de cada lotería abre sus filas de los
+                                         capítulos 05 y 07 del Máster Ka; se juegan los 4 que más han salido
     GET  /api/raya?fecha=...             3 en raya: los campos del capítulo 05 del Máster Ka que abre el último
                                          sorteo, en las mismas loterías que los 7 más fuertes
     GET  /api/vip?fecha=...              Público y VIP: las 7 parejas más fuertes en 1er premio de 10 loterías
@@ -47,6 +47,7 @@ from .reglas import indicadas as libro
 from .reglas import master as libro_master
 from .reglas import formula as libro_formula
 from .reglas import raya as libro_raya
+from .reglas import king as libro_king
 
 PAGINA = Path(__file__).resolve().parent / "web" / "index.html"
 
@@ -509,52 +510,16 @@ def fuertes(con, fecha: date) -> dict | None:
 
 # --------------------------------------------------------------- Master King
 
-PUNTOS_MASTER = 4
-
-
-def _king(veces: Counter, ultima: dict[str, date], fila: list[str]) -> list[dict]:
-    """Los 7 más fuertes mezclados con la fila Master de la Nacional Noche, por puntos.
-
-    Cada pareja número-inverso de los 7 más fuertes suma puntos por su puesto (I = 7 ... VII = 1)
-    y la que tiene un número de la fila suma PUNTOS_MASTER más. Se juegan las 7 con más puntos;
-    en empate, la que más ha salido. Así una de la fila que no está entre los fuertes queda
-    detrás del IV y delante del V.
-    """
-    puntos: dict[str, int] = {}
-    puesto: dict[str, int] = {}
-    par: dict[str, tuple[str, str]] = {}
-    for i, (a, b) in enumerate(_top(veces, ultima, fila)):
-        k = min(a, b)
-        puntos[k], puesto[k], par[k] = CUANTOS_FUERTES - i, i + 1, (a, b)
-    en_fila = {min(n, n[::-1]) for n in fila}
-    for n in fila:
-        k = min(n, n[::-1])
-        par.setdefault(k, (n, n[::-1]))  # de la fila: la bola grande es el número del libro
-    for k in en_fila:
-        puntos[k] = puntos.get(k, 0) + PUNTOS_MASTER
-
-    def fuerza(k):
-        return veces[k] + (veces[k[::-1]] if k != k[::-1] else 0)
-    elegidas = sorted(puntos, key=lambda k: (-puntos[k], -fuerza(k), k))[:CUANTOS_FUERTES]
-    return [{"numero": par[k][0], "inverso": par[k][1], "puntos": puntos[k],
-             "puesto": puesto.get(k), "master": k in en_fila} for k in elegidas]
-
-
 def master_king(con, fecha: date) -> dict | None:
+    """Capítulos 05 y 07: los números del último sorteo de cada lotería abren sus filas y
+    se juegan los libro_king.CUANTOS de esas filas que más han salido en esa lotería."""
     todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
     if not todos:
         return None
     hoy = datetime.now(recolector.ZONA_RD).date()
     desde = fecha - timedelta(days=365 * AÑOS_FUERTES)
-    nacional = {s.fecha: s.numeros[0] for s in todos if s.loteria == libro_master.DISPARADOR and s.fecha < fecha}
-
-    def fila_de(dia: date) -> list[str]:
-        numero = libro_master.disparo(nacional, dia)
-        return libro_master.LIBRO[numero] if numero else []
-
     r = _recorrer(todos, fecha, lambda s, v, veces, ultima: {
-        n for x in _king(veces, ultima, fila_de(s.fecha)) for n in (x["numero"], x["inverso"])})
-    fila = fila_de(fecha)
+        x["numero"] for x in libro_king.jugar(v[-1].numeros, veces, ultima)})
 
     tarjetas = []
     for etiqueta, nombre in LOTERIAS_FUERTES:
@@ -564,20 +529,17 @@ def master_king(con, fecha: date) -> dict | None:
         real = r.reales.get(nombre)
         salidos = set(real.numeros) if real else None
         cuenta, ultima = +r.veces[nombre], r.ultima[nombre]
-        numeros = []
-        for x in _king(cuenta, ultima, fila):
-            n, inv = x["numero"], x["inverso"]
-            vistos = [(fecha - ultima[y]).days for y in (n, inv) if y in ultima]
-            numeros.append({**x, "inverso": inv if inv != n else None,
-                            "veces": sum(cuenta[y] for y in {n, inv}),
-                            "hace": min(vistos) if vistos else None,
-                            "acierto": _salio(salidos, [n]),
-                            "acierto_inverso": _salio(salidos, [inv]) if inv != n else None})
+        abre = v[-1]
         tarjetas.append({
             "etiqueta": etiqueta,
             "nombre": nombre,
             "sorteos": len(v),
-            "numeros": numeros,
+            "abre": {"fecha": abre.fecha.isoformat(), "numeros": list(abre.numeros),
+                     "filas": [{"primero": p, "siguen": libro_king.LIBRO[p]}
+                               for p in dict.fromkeys(abre.numeros) if p in libro_king.LIBRO]},
+            "numeros": [{**x, "hace": (fecha - ultima[x["numero"]]).days if x["numero"] in ultima else None,
+                         "acierto": _salio(salidos, [x["numero"]])}
+                        for x in libro_king.jugar(abre.numeros, cuenta, ultima)],
             "resultado": list(real.numeros) if real else None,
         })
 
@@ -587,10 +549,7 @@ def master_king(con, fecha: date) -> dict | None:
         "hoy": hoy.isoformat(),
         "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
         "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
-        "nacional": {"numero": libro_master.disparo(nacional, fecha),
-                     "fecha": (fecha - timedelta(days=1)).isoformat(), "fila": fila},
-        "cuantos": CUANTOS_FUERTES,
-        "puntos_master": PUNTOS_MASTER,
+        "cuantos": libro_king.CUANTOS,
         "años": AÑOS_FUERTES,
         "desde": max(desde, primer_dia).isoformat(),
         "loterias": tarjetas,

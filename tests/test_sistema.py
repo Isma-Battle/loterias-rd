@@ -129,19 +129,22 @@ class TestFuertes(unittest.TestCase):
 
 
 class TestMasterKing(unittest.TestCase):
-    def test_puntos(self):
+    def test_libro(self):
+        from loterias.reglas import king
+        self.assertEqual(king.LIBRO["00"], ["81", "49", "25"])          # capítulo 05
+        self.assertEqual(king.LIBRO["07"], ["17", "19", "97", "70", "12", "61"])  # 05 y 07 juntos
+        self.assertEqual(king.LIBRO["24"], ["14", "34", "05", "98"])
+
+    def test_los_4_mas_salidos(self):
         from collections import Counter
-        from loterias import web
-        # 7 parejas fuertes con fuerza 10, 9 ... 4; el 99 casi no sale
-        veces = Counter({f"{i}{i + 1}": 10 - i for i in range(7)} | {"99": 1})
-        fila = ["01", "06", "51", "56"]  # 01 es el I de los fuertes (pareja 01-10)
-        k = web._king(veces, {}, fila)
-        self.assertEqual(len(k), 7)
-        self.assertEqual((k[0]["numero"], k[0]["puntos"], k[0]["puesto"], k[0]["master"]), ("01", 11, 1, True))
-        # 56 es el VI de los fuertes y está en la fila: 2 + 4. Las de la fila que no son fuertes
-        # (4 puntos) entran detrás del IV; el V (45) y el VII (67) se quedan fuera
-        self.assertEqual([(x["numero"], x["puntos"]) for x in k[1:]],
-                         [("12", 6), ("56", 6), ("23", 5), ("34", 4), ("06", 4), ("51", 4)])
+        from loterias.reglas import king
+        # Sale 07 (abre 17 19 97 70 12 61) y 99 (abre 00); 50 no empieza ninguna fila
+        veces = Counter({"17": 1, "19": 9, "97": 3, "70": 7, "12": 3, "61": 5, "00": 8})
+        k = king.jugar(("07", "99", "50"), veces, {"12": date(2026, 1, 5)})
+        self.assertEqual([x["numero"] for x in k], ["19", "00", "70", "61"])
+        veces["61"] = 0
+        k = king.jugar(("07",), veces, {"12": date(2026, 1, 5)})
+        self.assertEqual([x["numero"] for x in k], ["19", "70", "12", "97"])  # 12 salió más reciente
 
 
 class TestPublicoVip(unittest.TestCase):
