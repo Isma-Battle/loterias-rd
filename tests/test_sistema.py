@@ -239,5 +239,32 @@ class TestMaster(unittest.TestCase):
         self.assertGreater(r[0].probabilidad, r[1].probabilidad)
 
 
+class TestMasterKA(unittest.TestCase):
+    def test_ejemplos_del_video(self):
+        from loterias.reglas import master_ka as m
+        # capítulo 5: lo que dice el video
+        self.assertEqual(m.CAPITULO_5["69"], ["15", "22"])
+        self.assertEqual(m.CAPITULO_5["57"], ["64", "46"])
+        self.assertEqual(m.CAPITULO_5["95"], ["40"])
+        self.assertEqual(m.CAPITULO_5["20"], ["02", "14", "41"])
+        # capítulos 4 y 13: 15 -> 69, 40 -> 95, 08 -> 57
+        self.assertEqual(m.pales("15"), ["69"])
+        self.assertEqual(m.pales("40"), ["95"])
+        self.assertEqual(m.pales("08"), ["57"])
+        self.assertEqual(m.CAPITULO_6["57"], "75")
+
+    def test_cuenta_el_mas_fuerte(self):
+        from loterias.reglas import master_ka as m
+        ayer = date(2026, 1, 1)
+        todas = [Sorteo("La Primera Día", "La Primera", ayer, ("95", "01", "02")),
+                 Sorteo("Primera Noche", "La Primera", ayer, ("95", "03", "04")),
+                 Sorteo("New York Noche", "Americanas", ayer, ("69", "05", "06")),
+                 Sorteo("Quiniela Leidsa", "Leidsa", ayer, ("60", "07", "08"))]
+        ctx = Contexto("Quiniela Real", date(2026, 1, 2), todas[:1], todas)
+        # 95 -> 40 dos veces; 59-95 del capítulo 6 también suma; 69 y 60 -> 15 dos veces
+        self.assertEqual(m.mas_fuertes(m.conteo(m.numeros_de_ayer(ctx)), 2), ["15", "40"])
+        self.assertEqual(m.MasterPale().predecir(ctx)[0], "15")
+
+
 if __name__ == "__main__":
     unittest.main()
