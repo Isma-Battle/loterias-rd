@@ -510,11 +510,6 @@ def fuertes(con, fecha: date) -> dict | None:
 # --------------------------------------------------------------- Master King
 
 PUNTOS_MASTER = 4
-# Master King solo mira La Primera, La Suerte, New York, Gana Más y la Nacional
-_SOLO_KING = {"La Primera Día", "Primera Noche", "La Suerte 12:30", "La Suerte 18:00",
-              "New York Tarde", "New York Noche", "Gana Más", "Lotería Nacional"}
-LOTERIAS_KING = [(e, n) for e, n in LOTERIAS_FUERTES if n in _SOLO_KING]
-NOMBRES_KING = [n for _, n in LOTERIAS_KING]
 
 
 def _king(veces: Counter, ultima: dict[str, date], fila: list[str]) -> list[dict]:
@@ -546,7 +541,7 @@ def _king(veces: Counter, ultima: dict[str, date], fila: list[str]) -> list[dict
 
 
 def master_king(con, fecha: date) -> dict | None:
-    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_KING]
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
     if not todos:
         return None
     hoy = datetime.now(recolector.ZONA_RD).date()
@@ -562,7 +557,7 @@ def master_king(con, fecha: date) -> dict | None:
     fila = fila_de(fecha)
 
     tarjetas = []
-    for etiqueta, nombre in LOTERIAS_KING:
+    for etiqueta, nombre in LOTERIAS_FUERTES:
         v = [x for x in r.ventana.get(nombre, []) if x.fecha >= desde]
         if not v:
             continue
