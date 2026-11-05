@@ -19,6 +19,8 @@ y pide los datos a estas rutas (todas devuelven JSON):
                                          capítulos 05 y 07 del Máster Ka; se juegan los 4 que más han salido
     GET  /api/raya?fecha=...             3 en raya: los campos del capítulo 05 del Máster Ka que abre el último
                                          sorteo, en las mismas loterías que los 7 más fuertes
+    GET  /api/josefina?fecha=...         Guía Josefina: lo que salió ayer en las loterías indicadas jala su
+                                         secuencia; se juegan los 6 más respaldados con su V
     GET  /api/vip?fecha=...              Público y VIP: las 7 parejas más fuertes en 1er premio de 10 loterías
                                          juntas; las 4 primeras son del Público y las otras 3 del VIP
     GET  /api/formula?fecha=...          La Fórmula: 6 números de la Anguila de las 10 AM (1·23·2 -> 12 32) y en
@@ -48,6 +50,7 @@ from .reglas import master as libro_master
 from .reglas import formula as libro_formula
 from .reglas import raya as libro_raya
 from .reglas import king as libro_king
+from .reglas import josefina as libro_josefina
 
 PAGINA = Path(__file__).resolve().parent / "web" / "index.html"
 
@@ -649,6 +652,78 @@ def tres_en_raya(con, fecha: date) -> dict | None:
 
 _cache_raya: dict = {}
 
+# ------------------------------------------------------------------- Josefina
+
+NOMBRES_JOSEFINA = [n for nombres in libro_josefina.FAMILIAS.values() for n in nombres]
+
+
+def josefina(con, fecha: date) -> dict | None:
+    """Guía Josefina: en cada lotería, lo que salió ayer (y anteayer) en sus loterías indicadas
+    abre sus secuencias, y se juegan los libro_josefina.CUANTOS números más respaldados con su V."""
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_JOSEFINA]
+    if not todos:
+        return None
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    indice = {(s.loteria, s.fecha): s for s in todos}
+    buscar = lambda loteria, dia: indice.get((loteria, dia))  # noqa: E731
+    ultimo = {s.loteria: s.fecha for s in todos if s.fecha < fecha}
+
+    tarjetas = []
+    for familia, nombres in libro_josefina.FAMILIAS.items():
+        for nombre in nombres:
+            if nombre not in ultimo or (fecha - ultimo[nombre]).days > DIAS_INACTIVA:
+                continue
+            real = indice.get((nombre, fecha))
+            salidos = set(real.numeros) if real else None
+            j = libro_josefina.jugar(nombre, fecha, buscar)
+            tarjetas.append({
+                "nombre": nombre,
+                "familia": familia,
+                "fuerte": familia in libro_josefina.MAS_FUERTES,
+                "indicadas": [f for f, _ in libro_josefina.de_donde(familia)],
+                "numeros": [{**x, "acierto": _salio(salidos, [x["numero"]]),
+                             "acierto_v": _salio(salidos, [x["inverso"]]) if x["inverso"] else None}
+                            for x in j["jugada"]],
+                "abiertas": j["abiertas"],
+                "pales": j["pales"],
+                "resultado": list(real.numeros) if real else None,
+            })
+
+    # Cómo le fue: cada sorteo de los DIAS_PRUEBA días anteriores, con lo que había antes de ese día
+    clave = (fecha, len(todos))
+    if clave not in _cache_josefina:
+        sorteos = jugados = aciertos = con_acierto = con_v = 0
+        for s in todos:
+            if fecha - timedelta(days=DIAS_PRUEBA) <= s.fecha < fecha:
+                j = libro_josefina.jugar(s.loteria, s.fecha, buscar)["jugada"]
+                if not j:
+                    continue
+                directos = {x["numero"] for x in j}
+                ac = len(directos & set(s.numeros))
+                sorteos, jugados, aciertos = sorteos + 1, jugados + len(directos), aciertos + ac
+                con_acierto += ac > 0
+                con_v += any(x["inverso"] in s.numeros for x in j if x["inverso"])
+        p = motor.PROB_AZAR
+        _cache_josefina[clave] = {**_medir(aciertos, jugados, p), "sorteos": sorteos, "con_acierto": con_acierto,
+                                  "con_v": con_v,
+                                  "prob_alguno": round(1 - (1 - p) ** (jugados / sorteos), 4) if sorteos else 0}
+
+    primer_dia = todos[0].fecha
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat() if fecha - timedelta(days=1) > primer_dia else None,
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "cuantos": libro_josefina.CUANTOS,
+        "indica": libro_josefina.INDICA,
+        "loterias": tarjetas,
+        "prueba": _cache_josefina[clave],
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
+_cache_josefina: dict = {}
+
 # ------------------------------------------------------------- Público y VIP
 
 # Los 7 más fuertes en 1ra, contando estas loterías juntas como si fueran una sola
@@ -1099,6 +1174,15 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     except ValueError:
                         fecha = datetime.now(recolector.ZONA_RD).date()
                     datos = tres_en_raya(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/josefina":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = josefina(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)

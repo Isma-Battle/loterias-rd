@@ -223,6 +223,58 @@ class TestTresEnRaya(unittest.TestCase):
                          [("25", "52", 2, ["00"]), ("65", "56", 1, ["12"]), ("66", "66", 1, ["12"])])
 
 
+class TestJosefina(unittest.TestCase):
+    def test_guia(self):
+        from loterias.reglas import josefina
+        self.assertEqual(len(josefina.LIBRO), 100)
+        self.assertEqual(josefina.LIBRO["30"], ["85", "15", "70"])   # el ejemplo del video
+        self.assertEqual(josefina.LIBRO["01"], ["10", "00", "68"])   # el 100 de la guía es el 00
+        self.assertEqual(josefina.LIBRO["00"], ["10", "98", "50"])
+        self.assertEqual(josefina.LIBRO["98"], ["43", "04", "02"])
+
+    def test_jala_lo_de_ayer_en_las_indicadas(self):
+        from loterias.reglas import josefina
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        datos = {
+            # ayer en la Nacional: 30 jala 85 15 70 (4 puntos cada uno)
+            ("Lotería Nacional", d(9)): Sorteo("Lotería Nacional", "Nacional", d(9), ("30", "60", "99")),
+            # ayer en Leidsa (2.ª indicada de la Nacional): 37 jala 13 73 93 (3 puntos)
+            ("Quiniela Leidsa", d(9)): Sorteo("Quiniela Leidsa", "Leidsa", d(9), ("37", "88", "88")),
+            # anteayer en la Nacional salió el 06: jala 15 60 23, pero el 60 ya salió ayer
+            ("Lotería Nacional", d(8)): Sorteo("Lotería Nacional", "Nacional", d(8), ("06", "05", "05")),
+            # La Primera no es indicada para la Nacional: no cuenta
+            ("La Primera Día", d(9)): Sorteo("La Primera Día", "La Primera", d(9), ("50", "50", "50")),
+        }
+        j = josefina.jugar("Lotería Nacional", d(10), lambda l, f: datos.get((l, f)))
+        nums = {x["numero"]: x for x in j["jugada"]}
+        self.assertEqual(j["jugada"][0]["numero"], "15")
+        self.assertEqual(nums["15"]["puntos"], 12)         # lo jalan el 30 y el 60 de ayer y el 06 de anteayer
+        self.assertEqual(nums["15"]["inverso"], "51")
+        self.assertNotIn("60", nums)                        # ya salió: secuencia cerrada
+        self.assertNotIn("03", nums)                        # 50 es de La Primera
+        self.assertEqual(j["pales"], [])                    # el palé 06-15 solo se da el día siguiente
+        datos[("Quiniela Leidsa", d(9))] = Sorteo("Quiniela Leidsa", "Leidsa", d(9), ("06", "88", "88"))
+        j = josefina.jugar("Lotería Nacional", d(10), lambda l, f: datos.get((l, f)))
+        self.assertEqual(j["pales"], [])                    # palés solo de la misma lotería
+        j = josefina.jugar("Quiniela Leidsa", d(10), lambda l, f: datos.get((l, f)))
+        self.assertEqual(j["pales"], [["06", "15"]])
+        self.assertEqual(len(j["jugada"]), josefina.CUANTOS)
+
+    def test_web(self):
+        import sqlite3
+        from loterias import db, web
+        con = sqlite3.connect(":memory:")
+        con.execute("CREATE TABLE sorteos (loteria TEXT, grupo TEXT, fecha TEXT, numeros TEXT)")
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        db.guardar(con, [Sorteo("Lotería Nacional", "Nacional", d(i), ("30", "85", "15")) for i in range(1, 11)])
+        r = web.josefina(con, d(10))
+        nac = r["loterias"][0]
+        self.assertEqual(nac["nombre"], "Lotería Nacional")
+        self.assertEqual(nac["resultado"], ["30", "85", "15"])
+        self.assertTrue(any(x["acierto"] for x in nac["numeros"]))
+        self.assertGreater(r["prueba"]["aciertos"], 0)
+
+
 class TestMaster(unittest.TestCase):
     def test_libro(self):
         from loterias.reglas import master
