@@ -22,15 +22,19 @@ y pide los datos a estas rutas (todas devuelven JSON):
     GET  /api/josefina?fecha=...         Guía Josefina: lo que salió ayer en las loterías indicadas jala su
                                          secuencia; se juegan los 6 más respaldados con su V
     GET  /api/vip?fecha=...              Público y VIP: las 7 parejas más fuertes en 1er premio de 10 loterías
-                                         juntas; las 4 primeras son del Público y las otras 3 del VIP
+                                         juntas; las 4 primeras son del Público y las otras 3 del VIP. Los
+                                         que además abre el Libro oculto (1ros premios de 3 días) llevan fuego
     GET  /api/formula?fecha=...          La Fórmula: 6 números de la Anguila de las 10 AM (1·23·2 -> 12 32) y en
                                          qué loterías de ese día han salido más de 1er premio
+    GET  /api/laboratorio?fecha=...      Laboratorio: los números en que más métodos coinciden, El Vigilante
+                                         (busca máquinas sesgadas) y la tabla de la verdad de cada método
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
 from __future__ import annotations
 
 import json
+import math
 import sys
 import threading
 import time
@@ -51,6 +55,8 @@ from .reglas import formula as libro_formula
 from .reglas import raya as libro_raya
 from .reglas import king as libro_king
 from .reglas import josefina as libro_josefina
+from .reglas import oculto as libro_oculto
+from .reglas import vigilante as libro_vigilante
 
 PAGINA = Path(__file__).resolve().parent / "web" / "index.html"
 
@@ -736,6 +742,8 @@ LOTERIAS_VIP = [
 ]
 NOMBRES_VIP = [n for _, n in LOTERIAS_VIP]
 CUANTOS_PUBLICO = 4  # los de más fuerza en 1ra; los otros 3 de los 7 son VIP
+# El Libro oculto mira los 1ros premios de estas (el libro dice que va mejor en Nacional, Florida y New York)
+NOMBRES_OCULTO = NOMBRES_VIP + ["Florida Día", "Florida Noche"]
 VIDA_PRIMERA = 7     # días: un 1er premio de hace 7 días vale la mitad que uno de ayer
 
 
@@ -802,10 +810,15 @@ def publico_vip(con, fecha: date) -> dict | None:
         return None
     hoy = min(datetime.now(recolector.ZONA_RD).date(), date.fromisoformat(ultimo) + timedelta(days=1))
     fecha = min(fecha, hoy)
-    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_VIP]
+    cargados = db.cargar(con, hasta=fecha)
+    todos = [s for s in cargados if s.loteria in NOMBRES_VIP]
     if not todos:
         return None
     sorteos, parejas = _vip(todos, fecha)
+    # Libro oculto: lo que abren los 1ros premios de los últimos días; si coincide con el Público o
+    # el VIP, ese número cumple los dos métodos (fuego)
+    abiertos, abiertas = libro_oculto.abiertos(
+        libro_oculto.primeras_de([s for s in cargados if s.loteria in NOMBRES_OCULTO], fecha))
     reales = {s.loteria: s for s in todos if s.fecha == fecha}
 
     def jugados(lista):
@@ -815,6 +828,8 @@ def publico_vip(con, fecha: date) -> dict | None:
     for x in parejas:
         p = {x["numero"], x["inverso"]}
         numeros.append({**x, "inverso": x["inverso"] if x["inverso"] != x["numero"] else None,
+                        "fuego": [y for y in (x["numero"], x["inverso"]) if y in abiertos],
+                        "oculto": {y: abiertos[y] for y in dict.fromkeys((x["numero"], x["inverso"])) if y in abiertos},
                         "en_primera": [s.loteria for s in reales.values() if s.numeros[0] in p],
                         "donde": [s.loteria for s in reales.values() if p & set(s.numeros)]})
     resultados = []
@@ -876,10 +891,181 @@ def publico_vip(con, fecha: date) -> dict | None:
         "resultados": resultados,
         "prueba": _cache_vip[clave],
         "dias_prueba": DIAS_PRUEBA,
+        "oculto": {"dias": libro_oculto.DIAS_ATRAS, "loterias": NOMBRES_OCULTO, "abiertas": abiertas,
+                   "fuego": sorted({y for x in numeros for y in x["fuego"]})},
     }
 
 
 _cache_vip: dict = {}
+
+# --------------------------------------------------------------- Laboratorio
+
+# Un número sale en un sorteo en 1ra con 1 % y en cualquier premio con ≈ 2.97 %
+CUANTOS_CONSENSO = 7
+Z_AZAR = 2.0  # entre −2 y +2 es suerte normal
+
+
+def _numeros_de(nombre: str, r: dict) -> set[str]:
+    """Los números que recomienda cada método ese día (en cualquiera de sus loterías)."""
+    def par(x):
+        return {x["numero"], x["inverso"]} - {None}
+    if nombre == "El Oráculo":
+        return {x["numero"] for x in r["destacados"]}
+    if nombre == "Loterías indicadas":
+        return {j["numero"] for l in r["loterias"] for j in l["jugadas"]}
+    if nombre == "Los 7 más fuertes":
+        return {n for l in r["loterias"] for x in l["numeros"] for n in par(x)}
+    if nombre == "Master":
+        return {x["numero"] for l in r["loterias"] for x in l["ranking"]}
+    if nombre == "Master King":
+        return {x["numero"] for l in r["loterias"] for x in l["numeros"]}
+    if nombre == "3 en raya":
+        return {n for x in r["numeros"] for n in par(x)}
+    if nombre == "Josefina":
+        return {n for l in r["loterias"] for x in l["numeros"] for n in par(x)}
+    if nombre == "Público y VIP":
+        return {n for x in r["publico"] + r["vip"] for n in par(x)}
+    if nombre == "La Fórmula":
+        return {x["numero"] for x in r["origen"]["formula"]}
+    return set()
+
+
+def _verdad(nombre: str, que: str, m: dict, enlace: str) -> dict:
+    return {"metodo": nombre, "mide": que, "aciertos": m["aciertos"], "esperado": m["esperado"],
+            "vs_azar": m["vs_azar"], "z": m["z"], "enlace": enlace}
+
+
+def _prueba_fuego(con, fecha: date) -> dict:
+    """1ros premios de los números con fuego del Público y VIP en los DIAS_PRUEBA días anteriores."""
+    cargados = db.cargar(con, hasta=fecha)
+    vip = [s for s in cargados if s.loteria in NOMBRES_VIP]
+    clave = (fecha, len(cargados))
+    if clave not in _cache_fuego:
+        fuentes = [s for s in cargados if s.loteria in NOMBRES_OCULTO]
+        por_dia: dict[date, list[db.Sorteo]] = defaultdict(list)
+        for s in vip:
+            if fecha - timedelta(days=DIAS_PRUEBA) <= s.fecha < fecha:
+                por_dia[s.fecha].append(s)
+        aciertos = jugados = 0
+        for dia, del_dia in por_dia.items():
+            parejas = _vip(vip, dia)[1]
+            abiertos = libro_oculto.abiertos(libro_oculto.primeras_de(fuentes, dia))[0]
+            fuego = {y for x in parejas for y in (x["numero"], x["inverso"]) if y in abiertos}
+            for s in del_dia:
+                jugados += len(fuego)
+                aciertos += s.numeros[0] in fuego
+        _cache_fuego.clear()
+        _cache_fuego[clave] = _medir(aciertos, jugados, libro.PROB_PRIMERO)
+    return _cache_fuego[clave]
+
+
+_cache_fuego: dict = {}
+
+
+def laboratorio(con, fecha: date) -> dict | None:
+    """Jugada de consenso de todos los métodos, El Vigilante (sesgos en las máquinas) y la
+    tabla de la verdad (cómo le ha ido a cada método contra el azar)."""
+    hoy = datetime.now(recolector.ZONA_RD).date()
+    fecha = min(fecha, hoy)
+    metodos = [
+        ("El Oráculo", recomendaciones, "oraculo"), ("Loterías indicadas", indicadas, "indicadas"),
+        ("Los 7 más fuertes", fuertes, "fuertes"), ("Master", master, "master"),
+        ("Master King", master_king, "king"), ("3 en raya", tres_en_raya, "raya"),
+        ("Josefina", josefina, "josefina"), ("Público y VIP", publico_vip, "vip"),
+        ("La Fórmula", la_formula, "formula"),
+    ]
+    respuestas = {}
+    for nombre, fn, enlace in metodos:
+        try:
+            r = fn(con, fecha)
+        except Exception as e:  # un método roto no tumba el laboratorio
+            print(f"Laboratorio: {nombre} falló: {e}", file=sys.stderr)
+            r = None
+        if r:
+            respuestas[nombre] = (r, enlace)
+    if not respuestas:
+        return None
+
+    # 1. Consenso: cuántos métodos distintos recomiendan cada número
+    votos: dict[str, list[str]] = defaultdict(list)
+    for nombre, (r, _) in respuestas.items():
+        for n in _numeros_de(nombre, r):
+            votos[n].append(nombre)
+    elegidos = sorted(votos, key=lambda n: (-len(votos[n]), n))[:CUANTOS_CONSENSO]
+    reales = {s.loteria: s for s in db.cargar(con, hasta=fecha) if s.fecha == fecha and s.loteria in NOMBRES_VIP}
+    # también cuenta si sale su inverso (20 -> 02); los dobles (22) no tienen otro inverso
+    consenso = [{"numero": n, "votos": len(votos[n]), "metodos": sorted(votos[n]),
+                 "inverso": n[::-1] if n[::-1] != n else None,
+                 "en_primera": [l for l, s in reales.items() if s.numeros[0] == n],
+                 "donde": [l for l, s in reales.items() if n in s.numeros],
+                 "inv_primera": [l for l, s in reales.items() if n[::-1] != n and s.numeros[0] == n[::-1]],
+                 "inv_donde": [l for l, s in reales.items() if n[::-1] != n and n[::-1] in s.numeros]}
+                for n in elegidos]
+
+    # 2. El Vigilante: todas las quinielas activas
+    todos = db.cargar(con, hasta=fecha)
+    por_lot: dict[str, list[db.Sorteo]] = defaultdict(list)
+    for s in todos:
+        if s.fecha < fecha and len(s.numeros) == 3 and all(len(n) == 2 and n.isdigit() for n in s.numeros):
+            por_lot[s.loteria].append(s)
+    activas = {l: ss for l, ss in por_lot.items()
+               if len(ss) >= libro_vigilante.MIN_SORTEOS and (fecha - ss[-1].fecha).days <= DIAS_INACTIVA}
+    vigilante = []
+    for l, ss in activas.items():
+        v = libro_vigilante.revisar(ss, len(activas))
+        if v:
+            vigilante.append({"loteria": l, "grupo": ss[-1].grupo, **v})
+    vigilante.sort(key=lambda x: (x["p"], x["loteria"]))
+
+    # 3. Tabla de la verdad: lo que cada método mide de sí mismo en los últimos días
+    verdad = []
+    for nombre, (r, enlace) in respuestas.items():
+        p = r.get("prueba")
+        if nombre == "El Oráculo":
+            verdad.append(_verdad(nombre, "cualquier premio", r["oraculo"], enlace))
+        elif nombre == "Loterías indicadas":
+            verdad.append(_verdad(nombre, "cualquier premio", p[0], enlace))
+        elif nombre == "Master":
+            verdad.append(_verdad(nombre, "cualquier premio", p["cuatro"], enlace))
+        elif nombre == "Público y VIP":
+            verdad.append(_verdad("Público", "1er premio", p["publico"]["primera"], enlace))
+            verdad.append(_verdad("VIP", "1er premio", p["vip"]["primera"], enlace))
+        elif nombre == "La Fórmula":
+            verdad.append(_verdad(nombre, "cualquier premio", p["elegidas"]["cualquiera"], enlace))
+        elif p and "z" in p:
+            verdad.append(_verdad(nombre, "cualquier premio", p, enlace))
+    verdad.append(_verdad("🔥 Fuego (Libro oculto)", "1er premio", _prueba_fuego(con, fecha), "vip"))
+    # con tantos métodos, alguno saldría "bueno" por suerte: se exige más (Bonferroni)
+    z_exigido = round(_z_bonferroni(len(verdad)), 2)
+
+    return {
+        "fecha": fecha.isoformat(),
+        "hoy": hoy.isoformat(),
+        "anterior": (fecha - timedelta(days=1)).isoformat(),
+        "siguiente": (fecha + timedelta(days=1)).isoformat() if fecha < hoy else None,
+        "metodos": len(respuestas),
+        "consenso": consenso,
+        "resultados": [{"nombre": l, "numeros": list(s.numeros)} for l, s in reales.items()],
+        "vigilante": vigilante,
+        "sesgos": sum(v["estado"] == "sesgo" for v in vigilante),
+        "verdad": verdad,
+        "z_exigido": z_exigido,
+        "ganadores": [v["metodo"] for v in verdad if v["z"] >= z_exigido],
+        "dias_prueba": DIAS_PRUEBA,
+    }
+
+
+def _z_bonferroni(pruebas: int, alfa: float = 0.05) -> float:
+    """El Z que hay que pasar para que, entre `pruebas` métodos, ganarle al azar no sea suerte (una cola)."""
+    objetivo = alfa / max(pruebas, 1)
+    bajo, alto = 0.0, 6.0
+    for _ in range(60):
+        medio = (bajo + alto) / 2
+        if 0.5 * math.erfc(medio / math.sqrt(2)) > objetivo:
+            bajo = medio
+        else:
+            alto = medio
+    return alto
 
 # --------------------------------------------------------------- La Fórmula
 
@@ -1192,6 +1378,15 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     except ValueError:
                         fecha = datetime.now(recolector.ZONA_RD).date()
                     datos = publico_vip(con, fecha)
+                    if datos is None:
+                        return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/laboratorio":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = laboratorio(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)

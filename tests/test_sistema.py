@@ -275,6 +275,78 @@ class TestJosefina(unittest.TestCase):
         self.assertGreater(r["prueba"]["aciertos"], 0)
 
 
+class TestLibroOculto(unittest.TestCase):
+    def test_libro(self):
+        from loterias.reglas import oculto
+        sec = {s["texto"]: s for s in oculto.LIBRO}
+        self.assertEqual(sec["00-06v-10v"]["siguen"], ["06", "60", "10", "01"])   # la v es volteado
+        self.assertEqual(sec["01v-56v"]["primero"], ["01", "10"])
+        self.assertTrue(sec["01-29"]["fuerte"])
+        # todos llevan su inverso, tengan "v" o no
+        self.assertEqual(sec["02-07-25-75"]["primero"], ["02", "20"])
+        self.assertEqual(sec["02-07-25-75"]["siguen"], ["07", "70", "25", "52", "75", "57"])
+        self.assertEqual(sec["44-49-99"]["primero"], ["44"])
+
+    def test_abiertos_y_fuego(self):
+        import sqlite3
+        from loterias import db, web
+        from loterias.reglas import oculto
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        prim = oculto.primeras_de([Sorteo("Florida Día", "Americanas", d(7), ("29", "00", "00")),   # 3 días atrás
+                                   Sorteo("Florida Día", "Americanas", d(6), ("37", "00", "00"))],  # 4: no cuenta
+                                  d(10))
+        nums, abiertas = oculto.abiertos(prim)
+        self.assertEqual([a["secuencia"] for a in abiertas], ["29-10", "29v-39-36", "92v-10v-39v"])  # 92v también es el 29
+        self.assertIn("10", nums)
+        self.assertNotIn("45", nums)
+        con = sqlite3.connect(":memory:")
+        con.execute("CREATE TABLE sorteos (loteria TEXT, grupo TEXT, fecha TEXT, numeros TEXT)")
+        db.guardar(con, [Sorteo("Lotería Nacional", "Nacional", d(i), ("10" if i < 9 else "29", "44", "15"))
+                         for i in range(1, 10)])
+        r = web.publico_vip(con, d(10))
+        self.assertIn("10", r["oculto"]["fuego"])            # 10/01 es del Público y lo abre el 29
+        self.assertTrue(any("10" in x["fuego"] for x in r["publico"] + r["vip"]))
+
+
+class TestVigilante(unittest.TestCase):
+    def _sorteos(self, n, elegir):
+        return [Sorteo("X", "X", date(2026, 1, 1), elegir(i)) for i in range(n)]
+
+    def test_maquina_pareja(self):
+        import random
+        from loterias.reglas import vigilante
+        r = random.Random(3)
+        ss = self._sorteos(400, lambda i: tuple(f"{r.randrange(100):02d}" for _ in range(3)))
+        v = vigilante.revisar(ss, 30)
+        self.assertEqual(v["universo"], 100)
+        self.assertNotEqual(v["estado"], "sesgo")
+
+    def test_maquina_sesgada(self):
+        import random
+        from loterias.reglas import vigilante
+        r = random.Random(4)
+        # el 07 sale muchísimo más que los demás, en todo el historial
+        ss = self._sorteos(400, lambda i: tuple("07" if r.random() < .15 else f"{r.randrange(100):02d}" for _ in range(3)))
+        v = vigilante.revisar(ss, 30)
+        self.assertEqual(v["estado"], "sesgo")
+        self.assertEqual(v["mas_salidos"][0]["numero"], "07")
+
+    def test_juego_corto_no_es_sesgo(self):
+        import random
+        from loterias.reglas import vigilante
+        r = random.Random(5)
+        ss = self._sorteos(300, lambda i: tuple(f"{r.randrange(51):02d}" for _ in range(3)))  # como Pega 3 Más
+        v = vigilante.revisar(ss, 30)
+        self.assertEqual(v["universo"], 51)
+        self.assertNotEqual(v["estado"], "sesgo")
+        self.assertIsNone(vigilante.revisar(ss[:50], 30))   # pocos sorteos
+
+    def test_z_exigido(self):
+        from loterias import web
+        self.assertAlmostEqual(web._z_bonferroni(1), 1.645, places=2)
+        self.assertGreater(web._z_bonferroni(11), 2.5)
+
+
 class TestMaster(unittest.TestCase):
     def test_libro(self):
         from loterias.reglas import master

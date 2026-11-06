@@ -142,6 +142,13 @@
   .bola.fallo { filter: grayscale(.85) brightness(.7); opacity: .55; box-shadow: none; }
   .bola.chica { min-width: 26px; height: 26px; font-size: 12px; padding: 0 5px; }
   .grande .bola { min-width: 52px; height: 52px; font-size: 20px; }
+  .bola.fuego { position: relative; }
+  .bola.fuego::after {
+    content: "🔥"; position: absolute; top: -9px; right: -9px; font-size: 15px; line-height: 1;
+    filter: drop-shadow(0 0 4px rgba(255, 120, 30, .8)); pointer-events: none;
+  }
+  .bola.chica.fuego::after { font-size: 11px; top: -7px; right: -7px; }
+  .grande .bola.fuego::after { font-size: 20px; top: -11px; right: -11px; }
 
   .orbe { display: flex; flex-direction: column; align-items: center; gap: 6px; animation: aparecer .6s both; animation-delay: calc(var(--i, 0) * 70ms); }
   .orbe-anillo { position: relative; display: grid; place-items: center; }
@@ -318,6 +325,208 @@
   .maestra.gano { border-color: rgba(56, 226, 160, .45); box-shadow: 0 0 30px rgba(56, 226, 160, .1); }
   .lista-senales .nota { margin-top: 4px; }
 
+  /* ---------------------------------------------------------- Público y VIP */
+  .vp-heroe { grid-template-columns: minmax(0, 1fr) minmax(320px, .9fr); }
+  .vp-jugada { display: grid; gap: 18px; padding: 18px; border-radius: 22px;
+    background: rgba(0, 0, 0, .22); border: 1px solid var(--borde); }
+  .vp-grupo { display: grid; gap: 10px; }
+  .vp-grupo .etiqueta { font: 600 11px var(--display); letter-spacing: .32em; color: var(--oro); text-transform: uppercase; }
+  .vp-pares { display: grid; gap: 10px; }
+  .vp-pares.cuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .vp-pares.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vp-mini { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 12px 6px;
+    border-radius: 16px; border: 1px solid var(--borde); background: rgba(255,255,255,.035); }
+  .vp-mini.con-fuego { border-color: rgba(255, 140, 50, .45); background: linear-gradient(180deg, rgba(255, 120, 30, .1), rgba(255,255,255,.02)); }
+  .vp-mini .bola { min-width: 44px; height: 44px; font-size: 18px; }
+  .vp-mini .bola.chica { min-width: 30px; height: 30px; font-size: 12.5px; }
+  .vp-leyenda { display: grid; gap: 4px; font-size: 12.5px; color: var(--tenue); text-align: center;
+    border-top: 1px solid var(--borde); padding-top: 12px; }
+  .vp-leyenda b { color: var(--oro); }
+
+  .vp-explica { margin-top: 16px; padding: 0; }
+  .vp-explica summary { cursor: pointer; padding: 16px 20px; font-weight: 600; color: var(--oro); list-style: none; }
+  .vp-explica summary::-webkit-details-marker { display: none; }
+  .vp-explica summary::before { content: "+"; display: inline-block; width: 22px; color: var(--oro-2); font-weight: 700; }
+  .vp-explica[open] summary::before { content: "−"; }
+  .vp-explica ul { margin: 0; padding: 0 24px 18px 44px; color: var(--tenue); font-size: 14px; line-height: 1.7; }
+  .vp-explica li b { color: var(--marfil); }
+  .vp-aviso { margin: 0 20px 10px; }
+
+  .vp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+  .vp-card { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 18px;
+    border-radius: 22px; border: 1px solid var(--borde);
+    background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012));
+    transition: transform .25s, border-color .25s, box-shadow .25s; }
+  .vp-card:hover { transform: translateY(-2px); border-color: var(--borde-fuerte); box-shadow: 0 16px 40px rgba(0,0,0,.35); }
+  .vp-card.vip { background: linear-gradient(180deg, rgba(139, 108, 255, .09), rgba(255,255,255,.012)); }
+  .vp-card.con-fuego { border-color: rgba(255, 140, 50, .4); }
+  .vp-card.gano { border-color: rgba(56, 226, 160, .5); box-shadow: 0 0 30px rgba(56, 226, 160, .1); }
+  .vp-cab { display: flex; justify-content: space-between; align-items: center; }
+  .romano-vp { font: 600 14px var(--display); color: var(--oro-2); letter-spacing: .08em; }
+  .vp-tag { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px;
+    border-radius: 999px; border: 1px solid var(--borde-fuerte); color: var(--oro); }
+  .vp-tag.vip { border-color: rgba(139, 108, 255, .55); color: #b9a6ff; background: rgba(139, 108, 255, .1); }
+  .vp-bolas { display: flex; justify-content: center; align-items: center; gap: 10px; padding: 4px 0; }
+  .vp-bolas .bola { min-width: 70px; height: 70px; font: 700 28px var(--display); }
+  .vp-bolas .bola.inv { min-width: 48px; height: 48px; font: 700 18px var(--display); }
+  .vp-bolas .bola.fuego::after { font-size: 22px; top: -10px; right: -10px; }
+  .vp-bolas .bola.inv.fuego::after { font-size: 16px; top: -8px; right: -8px; }
+  .vp-prob { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .vp-prob b { font: 700 24px/1 var(--display); color: var(--oro); font-variant-numeric: tabular-nums; }
+  .vp-prob span { font-size: 12px; color: var(--tenue); }
+  .vp-card .peso { margin-top: -6px; }
+  .vp-datos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .vp-datos > div { text-align: center; padding: 8px 4px; border-radius: 12px; background: rgba(255,255,255,.035); }
+  .vp-datos b { display: block; font: 700 17px/1.2 var(--display); color: var(--marfil); font-variant-numeric: tabular-nums; }
+  .vp-datos span { font-size: 11px; color: var(--tenue); line-height: 1.2; display: block; }
+  .vp-estado { font-size: 13px; color: var(--tenue); padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.035); }
+  .vp-estado.acierto { color: var(--esmeralda); background: rgba(56, 226, 160, .08); font-weight: 600; }
+  .vp-fuego { border-top: 1px solid var(--borde); padding-top: 12px; display: grid; gap: 8px; margin-top: auto; }
+  .vp-fuego.nada { font-size: 12px; color: var(--muy-tenue); }
+  .vp-fuego-tit { font-size: 12px; font-weight: 600; color: #ffb36b; }
+  .vp-origenes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vp-origen { font-size: 12px; color: var(--tenue); padding: 4px 9px; border-radius: 999px;
+    background: rgba(255, 120, 30, .08); border: 1px solid rgba(255, 140, 50, .25); white-space: nowrap; }
+  .vp-origen b { color: var(--marfil); }
+  .vp-origen.mas { color: #ffb36b; }
+
+  .vp-resultados { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .vp-res { display: grid; gap: 8px; padding: 14px; border-radius: 16px; border: 1px solid var(--borde); background: var(--panel); }
+  .vp-res.gano { border-color: rgba(56, 226, 160, .5); }
+  .vp-res a { font-weight: 600; font-size: 14px; text-decoration: none; }
+  .vp-res a:hover { color: var(--oro); }
+  .vp-res .vp-tag { justify-self: start; }
+
+  .vp-nota-libro { margin: 0 0 16px; }
+  .si-muestra, .vp-sec-num span.si { color: #2b1c03; font-weight: 700;
+    background: linear-gradient(180deg, #fbe3a2, var(--oro) 50%, var(--oro-2)); box-shadow: 0 0 10px rgba(255, 140, 50, .4); }
+  .si-muestra { padding: 1px 7px; border-radius: 6px; }
+  .vp-dias { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; align-items: start; }
+  .vp-dia { display: grid; gap: 8px; }
+  .vp-dia h4 { margin: 0 0 2px; font: 600 12px var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--oro); }
+  .vp-sec { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.025); }
+  .vp-sec.con-fuego { border-color: rgba(255, 140, 50, .35); background: rgba(255, 120, 30, .05); }
+  .vp-sec-cab { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+  .vp-sec-cab a { text-decoration: none; font-weight: 600; }
+  .vp-sec-cab a:hover { color: var(--oro); }
+  .vp-fuerte { margin-left: auto; }
+  .vp-sec-num { display: flex; flex-wrap: wrap; gap: 5px; }
+  .vp-sec-num span { min-width: 30px; text-align: center; padding: 3px 6px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    font-variant-numeric: tabular-nums; color: var(--marfil); background: rgba(255,255,255,.06); }
+  .vp-sec small { font-size: 11px; color: var(--muy-tenue); }
+  .vp-sec.vacia { font-size: 12.5px; color: var(--muy-tenue); text-align: center; }
+  .vp-resto { display: none; gap: 8px; }
+  .vp-dias.todos .vp-resto { display: grid; }
+  .vp-ver { display: block; margin: 18px auto 0; }
+
+  .vp-rinden { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 8px; }
+  .vp-rinde { display: grid; gap: 14px; padding: 16px; border-radius: 16px; background: rgba(255,255,255,.03); border: 1px solid var(--borde); }
+  .vp-rinde h4 { margin: 0; font: 600 13px var(--display); letter-spacing: .22em; text-transform: uppercase; color: var(--oro); }
+  .vp-comp { display: grid; gap: 5px; }
+  .vp-comp-cab { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--tenue); }
+  .vp-comp-cab b { font: 700 22px var(--display); color: var(--marfil); }
+  .vp-comp-cab b.bien { color: var(--esmeralda); }
+  .vp-barra { height: 7px; border-radius: 4px; background: rgba(255,255,255,.05); overflow: hidden; }
+  .vp-barra i { display: block; height: 100%; border-radius: 4px; }
+  .vp-barra i.real { background: linear-gradient(90deg, var(--oro-3), var(--oro)); }
+  .vp-barra i.azar { background: rgba(167, 163, 184, .45); }
+  .vp-comp small { font-size: 11.5px; color: var(--muy-tenue); }
+
+  @media (max-width: 900px) {
+    .vp-heroe { grid-template-columns: 1fr; }
+    .vp-rinden { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .vp-pares.cuatro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .vp-mini .bola { min-width: 38px; height: 38px; font-size: 16px; }
+    .vp-jugada { padding: 14px; }
+  }
+
+  /* ------------------------------------------------------------ Laboratorio */
+  .lab-heroe { grid-template-columns: minmax(0, 1fr) minmax(320px, .85fr); }
+  .lab-jugada { display: grid; gap: 14px; justify-items: center; text-align: center; padding: 22px 18px; border-radius: 22px;
+    background: rgba(0, 0, 0, .22); border: 1px solid var(--borde); }
+  .lab-jugada .etiqueta { font: 600 11px var(--display); letter-spacing: .32em; color: var(--oro); text-transform: uppercase; }
+  .lab-bolas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .lab-bolas .bola { min-width: 54px; height: 54px; font: 700 21px var(--display); }
+  .lab-jugada .nota { margin: 0; }
+
+  .lab-veredicto { margin-top: 16px; padding: 18px 22px; border-radius: 18px; font-size: 14.5px; line-height: 1.6; color: var(--tenue);
+    border: 1px solid rgba(56, 226, 160, .3); background: linear-gradient(90deg, rgba(56, 226, 160, .07), rgba(255,255,255,.02)); }
+  .lab-veredicto b { color: var(--marfil); }
+  .lab-veredicto.alerta { border-color: var(--borde-fuerte); background: linear-gradient(90deg, rgba(243, 207, 118, .12), rgba(255,255,255,.02)); }
+
+  .lab-consenso { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; }
+  .lab-voto { display: grid; grid-template-columns: 22px auto minmax(0, 1fr); gap: 14px; align-items: center; padding: 16px;
+    border-radius: 18px; border: 1px solid var(--borde); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012)); }
+  .lab-voto.gano { border-color: rgba(56, 226, 160, .5); }
+  .lab-voto > .bola { min-width: 56px; height: 56px; font: 700 22px var(--display); }
+  .lab-voto-info { display: grid; gap: 7px; min-width: 0; }
+  .lab-voto-cab { font-size: 13px; color: var(--tenue); }
+  .lab-voto-cab b { color: var(--oro); font: 700 16px var(--display); }
+  .lab-voto .peso { height: 4px; }
+  .lab-voto .peso::after { display: none; }
+  .lab-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .lab-chips span { font-size: 11px; color: var(--tenue); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--borde); background: rgba(255,255,255,.03); }
+
+  .lab-intro { margin: 0 0 16px; }
+  .lab-vigs { display: grid; gap: 2px; }
+  .lab-mas { display: none; gap: 2px; }
+  .lab-vigs.todos .lab-mas { display: grid; }
+  .lab-vig { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 130px; gap: 14px; align-items: center;
+    padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .lab-vig-nom a { font-weight: 600; font-size: 13.5px; text-decoration: none; display: block; }
+  .lab-vig-nom a:hover { color: var(--oro); }
+  .lab-vig-nom small { font-size: 11px; color: var(--muy-tenue); }
+  .lab-rareza { position: relative; height: 8px; border-radius: 4px; background: rgba(255,255,255,.05); }
+  .lab-rareza .lleno { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, rgba(56, 226, 160, .35), var(--esmeralda)); }
+  .lab-vig.vigilar .lleno { background: linear-gradient(90deg, var(--oro-3), var(--oro)); }
+  .lab-vig.sesgo .lleno { background: linear-gradient(90deg, #a33, var(--rubi)); }
+  .lab-rareza .linea { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--tenue); opacity: .6; }
+  .lab-rareza .linea.fuerte { width: 2px; background: var(--rubi); opacity: .9; }
+  .lab-estado { justify-self: end; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+    color: var(--esmeralda); border: 1px solid rgba(56, 226, 160, .35); background: rgba(56, 226, 160, .06); }
+  .lab-estado.vigilar { color: var(--oro); border-color: var(--borde-fuerte); background: rgba(243, 207, 118, .08); }
+  .lab-estado.sesgo { color: var(--rubi); border-color: var(--rubi); background: rgba(255, 122, 138, .1); }
+
+  .lab-verdad { display: grid; gap: 2px; }
+  .lab-fila { display: grid; grid-template-columns: minmax(150px, 220px) 110px minmax(0, 1fr) 56px; gap: 14px; align-items: center;
+    padding: 10px 6px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .lab-fila:last-child { border-bottom: 0; }
+  .lab-met a { font-weight: 600; font-size: 14px; text-decoration: none; display: block; }
+  .lab-met a:hover { color: var(--oro); }
+  .lab-met small, .lab-cuenta small { font-size: 11px; color: var(--muy-tenue); display: block; }
+  .lab-cuenta b { font: 700 17px var(--display); }
+  .lab-z { position: relative; height: 22px; border-radius: 6px; background: rgba(255,255,255,.02); }
+  .lab-z .zona { position: absolute; top: 0; bottom: 0; background: rgba(255,255,255,.05); border-radius: 6px; }
+  .lab-z .cero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muy-tenue); }
+  .lab-z .meta { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--oro); box-shadow: 0 0 8px rgba(243,207,118,.6); }
+  .lab-z .valor { position: absolute; top: 9px; height: 4px; border-radius: 2px; background: var(--tenue); opacity: .7; }
+  .lab-z .punto { position: absolute; top: 5px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--marfil); }
+  .lab-z .valor.gana, .lab-z .punto.gana { background: var(--esmeralda); opacity: 1; }
+  .lab-z .valor.baja, .lab-z .punto.baja { background: var(--rubi); }
+  .lab-zv { font: 700 15px var(--display); text-align: right; font-variant-numeric: tabular-nums; }
+  .lab-zv.gana { color: var(--esmeralda); }
+  .lab-zv.baja { color: var(--rubi); }
+  .lab-leyenda { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; font-size: 12px; color: var(--tenue); }
+  .lab-leyenda i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .lab-leyenda i.zona { width: 22px; height: 10px; border-radius: 3px; background: rgba(255,255,255,.12); }
+  .lab-leyenda i.meta { width: 2px; height: 14px; background: var(--oro); }
+
+  @media (max-width: 900px) {
+    .lab-heroe { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .lab-vig { grid-template-columns: minmax(0, 1fr) 100px; }
+    .lab-rareza { grid-column: 1 / -1; grid-row: 2; }
+    .lab-fila { grid-template-columns: minmax(0, 1fr) auto; }
+    .lab-z { grid-column: 1 / -1; }
+    .lab-zv { grid-row: 1; grid-column: 2; }
+    .lab-cuenta { display: none; }
+    .lab-voto { grid-template-columns: auto minmax(0, 1fr); }
+    .lab-voto .romano-vp { display: none; }
+  }
+
   footer { max-width: 1240px; margin: 0 auto; padding: 0 20px 40px; }
   footer p { font-size: 12.5px; color: var(--muy-tenue); text-align: center; line-height: 1.7; margin: 0; }
 
@@ -386,6 +595,7 @@
       <a href="#raya" id="tab-raya">3 en raya</a>
       <a href="#josefina" id="tab-josefina">Josefina</a>
       <a href="#vip" id="tab-vip">Público y VIP</a>
+      <a href="#laboratorio" id="tab-laboratorio">🔬 Laboratorio</a>
       <a href="#formula" id="tab-formula">La Fórmula</a>
       <a href="#dia" id="tab-dia">Resultados</a>
       <a href="#loteria" id="tab-loteria">Por lotería</a>
@@ -461,9 +671,9 @@ function ir(hash) { location.hash = hash; }
 
 async function mostrar() {
   const [vistaHash, ...resto] = location.hash.slice(1).split("/");
-  const vista = ["indicadas", "fuertes", "master", "king", "raya", "josefina", "vip", "formula", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
+  const vista = ["indicadas", "fuertes", "master", "king", "raya", "josefina", "vip", "laboratorio", "formula", "dia", "loteria"].includes(vistaHash) ? vistaHash : "oraculo";
   const param = decodeURIComponent(resto.join("/"));
-  for (const v of ["oraculo", "indicadas", "fuertes", "master", "king", "raya", "josefina", "vip", "formula", "dia", "loteria"])
+  for (const v of ["oraculo", "indicadas", "fuertes", "master", "king", "raya", "josefina", "vip", "laboratorio", "formula", "dia", "loteria"])
     $(`#tab-${v}`).classList.toggle("activo", v === vista);
   try {
     if (!resumen) await cargarResumen();
@@ -476,6 +686,7 @@ async function mostrar() {
     else if (vista === "raya") await vistaRaya(param);
     else if (vista === "josefina") await vistaJosefina(param);
     else if (vista === "vip") await vistaVip(param);
+    else if (vista === "laboratorio") await vistaLaboratorio(param);
     else if (vista === "formula") await vistaFormula(param);
     else if (vista === "dia") await vistaDia(param || resumen.hasta);
     else await vistaOraculo(param);
@@ -1217,44 +1428,122 @@ async function vistaJosefina(fecha) {
 
 // ----------------------------------------------------------- Público y VIP
 
-function parejasVip(lista, desde) {
-  const maximo = Math.max(...lista.map((x) => x.probabilidad));
-  return `<div class="panel"><div class="siete">${lista.map((x, i) => `<div class="pareja"
-      title="${esc((x.inverso ? `${x.numero} y ${x.inverso} cuentan como uno: ${x.primero} veces de 1er premio (${x.detalle.join(" + ")})`
-        : `${x.numero} es su propio inverso: ${x.primero} veces de 1er premio`) + `, ${x.veces} en cualquier premio.`)}">
-    <span class="pos">${ROMANOS[desde + i]}</span>
-    <span class="par"><span class="bola ${x.en_primera.length ? "acierto" : "oro"}">${esc(x.numero)}</span>${x.inverso
-      ? `<span class="bola chica">${esc(x.inverso)}</span>` : ""}</span>
-    <span class="datos"><b>${x.primero} veces en 1ra</b>${x.en_primera.length ? `<span class="master">✓ 1ra en ${x.en_primera.map(esc).join(", ")}</span>`
-        : x.donde.length ? `<span class="master">salió en ${x.donde.map(esc).join(", ")}</span>` : ""}
-      <small>${x.reciente} en los últimos 7 días · último 1er premio hace ${plural(x.hace_1ra, "día", "días")} · ${x.veces} en cualquier premio</small></span>
-    <span class="f1"><b>${(x.probabilidad * 100).toFixed(1)} %</b><small>probabilidad en 1ra (normal ${(x.normal * 100).toFixed(0)} %)</small>
-      <span class="peso"><span style="width:${100 * x.probabilidad / maximo}%"></span></span></span>
-  </div>`).join("")}</div></div>`;
+const nombreCorto = (n) => n.replace(/^Quiniela /, "Q. ").replace(/^Lotería /, "");
+
+// Una pareja en miniatura (para el héroe): bola grande + su inverso, con el fuego en la esquina
+function parVip(x, fuego) {
+  const b = (n, chica) => `<span class="bola ${chica ? "chica" : "oro"}${fuego.has(n) ? " fuego" : ""}">${esc(n)}</span>`;
+  return `<div class="vp-mini${x.fuego.length ? " con-fuego" : ""}">${b(x.numero)}${x.inverso ? b(x.inverso, true) : ""}</div>`;
 }
 
-function kpisVip(nombre, p, total) {
+// De dónde viene el fuego de una pareja, sin repetir: "32 · Q. Real · 3 nov"
+function origenesFuego(x) {
+  const vistos = new Map();
+  for (const lista of Object.values(x.oculto)) for (const o of lista) {
+    const k = `${o.numero}|${o.loteria}|${o.fecha}`;
+    if (!vistos.has(k)) vistos.set(k, { ...o, secuencias: new Set() });
+    vistos.get(k).secuencias.add(o.secuencia);
+  }
+  return [...vistos.values()];
+}
+
+function tarjetaVip(x, i, parte, maximo, fuego) {
+  const origen = origenesFuego(x);
+  const MAX = 3;
+  const chips = origen.slice(0, MAX).map((o) => `<span class="vp-origen" title="Secuencia ${esc([...o.secuencias].join(", "))}">
+      <b>${esc(o.numero)}</b> ${esc(nombreCorto(o.loteria))} · ${esc(fechaMini(o.fecha))}</span>`).join("");
+  const estado = x.en_primera.length ? `<div class="vp-estado acierto">✓ Salió de 1ra en ${x.en_primera.map(esc).join(", ")}</div>`
+    : x.donde.length ? `<div class="vp-estado">Salió en ${x.donde.map(esc).join(", ")}</div>` : "";
+  const ayuda = x.inverso ? `${x.numero} y ${x.inverso} cuentan como uno: ${x.primero} veces de 1er premio (${x.detalle.join(" + ")})`
+    : `${x.numero} es su propio inverso: ${x.primero} veces de 1er premio`;
+  return `<article class="vp-card ${parte}${x.fuego.length ? " con-fuego" : ""}${x.en_primera.length ? " gano" : ""}" title="${esc(ayuda)}">
+    <div class="vp-cab"><span class="romano-vp">${ROMANOS[i]}</span><span class="vp-tag ${parte}">${parte === "vip" ? "VIP" : "Público"}</span></div>
+    <div class="vp-bolas">
+      <span class="bola ${x.en_primera.length ? "acierto" : "oro"}${fuego.has(x.numero) ? " fuego" : ""}">${esc(x.numero)}</span>
+      ${x.inverso ? `<span class="bola inv${fuego.has(x.inverso) ? " fuego" : ""}">${esc(x.inverso)}</span>` : ""}
+    </div>
+    <div class="vp-prob"><b>${(x.probabilidad * 100).toFixed(1)}%</b><span>probabilidad en 1ra · normal ${(x.normal * 100).toFixed(0)}%</span></div>
+    <span class="peso"><span style="width:${100 * x.probabilidad / maximo}%"></span></span>
+    <div class="vp-datos">
+      <div><b>${x.primero}</b><span>veces en 1ra</span></div>
+      <div><b>${x.reciente}</b><span>últimos 7 días</span></div>
+      <div><b>${x.hace_1ra === 0 ? "hoy" : x.hace_1ra === 1 ? "ayer" : `${x.hace_1ra} días`}</b><span>último en 1ra</span></div>
+    </div>
+    ${estado}
+    ${origen.length ? `<div class="vp-fuego"><span class="vp-fuego-tit">🔥 Libro oculto · lo abren</span>
+      <div class="vp-origenes">${chips}${origen.length > MAX ? `<span class="vp-origen mas">+${origen.length - MAX}</span>` : ""}</div></div>`
+      : `<div class="vp-fuego nada">Sin fuego: el Libro oculto no lo abre</div>`}
+  </article>`;
+}
+
+// Real contra lo que daría el azar, en dos barras
+function comparaVip(titulo, real, azar, detalle) {
+  const tope = Math.max(real, azar, 1);
+  return `<div class="vp-comp">
+    <div class="vp-comp-cab"><span>${titulo}</span><b class="${real >= azar ? "bien" : ""}">${real}</b></div>
+    <div class="vp-barra"><i class="real" style="width:${100 * real / tope}%"></i></div>
+    <div class="vp-barra"><i class="azar" style="width:${100 * azar / tope}%"></i></div>
+    <small>Azar: ${azar.toFixed(0)} · ${detalle}</small></div>`;
+}
+
+function resumenVip(nombre, p, total) {
   const f = p.primera;
-  return `<div class="kpi"><b>${f.aciertos}</b><span>${nombre}: veces que el 1er premio fue uno de sus números · el azar daría ${f.esperado.toFixed(0)}
-    (${f.jugados ? f.vs_azar.toFixed(2) + "x" : "—"}, Z = ${f.z.toFixed(1)})</span></div>
-    <div class="kpi"><b>${p.aciertos}</b><span>${nombre}: aciertos en cualquier premio · el azar daría ${p.esperado.toFixed(0)}
-    (${p.jugados ? p.vs_azar.toFixed(2) + "x" : "—"}) en ${total} sorteos</span></div>`;
+  return `<div class="vp-rinde"><h4>${nombre}</h4>
+    ${comparaVip("1er premio acertado", f.aciertos, f.esperado, f.jugados ? `${f.vs_azar.toFixed(2)}x el azar` : "—")}
+    ${comparaVip("Aciertos en cualquier premio", p.aciertos, p.esperado, `${p.jugados ? p.vs_azar.toFixed(2) + "x el azar" : "—"} en ${total} sorteos`)}
+  </div>`;
 }
 
 async function vistaVip(fecha) {
   const d = await api(`/api/vip${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  // si el servidor es viejo y no trae el Libro oculto, la página sigue funcionando sin fuego
+  d.oculto = d.oculto || { dias: 3, loterias: [], abiertas: [], fuego: [] };
+  for (const x of [...d.publico, ...d.vip]) { x.fuego = x.fuego || []; x.oculto = x.oculto || {}; }
   const p = d.prueba;
   const meses = Math.round(diasEntre(d.desde, d.fecha) / 30.4);
   const nums = (lista) => lista.flatMap((x) => x.inverso ? [x.numero, x.inverso] : [x.numero]);
   const publico = new Set(nums(d.publico)), vip = new Set(nums(d.vip));
+  const fuego = new Set(d.oculto.fuego);
+  const total = publico.size + vip.size;
   const en1ra = (parte) => d.resultados.filter((r) => r.primera === parte).length;
+  const maximo = Math.max(...[...d.publico, ...d.vip].map((x) => x.probabilidad), 0.0001);
+
+  // Libro oculto: por día, cada 1er premio una sola vez con todo lo que abre
+  const dias = new Map();
+  for (const a of d.oculto.abiertas) {
+    if (!dias.has(a.fecha)) dias.set(a.fecha, new Map());
+    const k = `${a.numero}|${a.loteria}`;
+    const g = dias.get(a.fecha);
+    if (!g.has(k)) g.set(k, { numero: a.numero, loteria: a.loteria, secuencias: [], siguen: new Set(), fuerte: false });
+    const e = g.get(k);
+    e.secuencias.push(a.secuencia);
+    e.fuerte = e.fuerte || a.fuerte;
+    a.siguen.forEach((n) => e.siguen.add(n));
+  }
+  const cuantosFuego = (e) => [...e.siguen].filter((n) => fuego.has(n)).length;
+  const tarjetaSec = (e) => `<div class="vp-sec${cuantosFuego(e) ? " con-fuego" : ""}">
+        <div class="vp-sec-cab"><span class="bola chica primero">${esc(e.numero)}</span>
+          <a href="${enlaceLoteria(e.loteria)}">${esc(nombreCorto(e.loteria))}</a>${e.fuerte ? `<span class="vp-fuerte" title="El libro la marca como fuerte">💪</span>` : ""}</div>
+        <div class="vp-sec-num">${[...e.siguen].map((n) => `<span class="${fuego.has(n) ? "si" : ""}">${esc(n)}</span>`).join("")}</div>
+        <small>${e.secuencias.map(esc).join(" · ")}</small>
+      </div>`;
+  // Primero los que dan fuego; los demás quedan guardados en "ver los demás"
+  let resto = 0;
+  const columnas = [...dias.entries()].map(([f, g]) => {
+    const todas = [...g.values()].sort((a, b) => cuantosFuego(b) - cuantosFuego(a));
+    const conF = todas.filter(cuantosFuego), sinF = todas.filter((e) => !cuantosFuego(e));
+    resto += sinF.length;
+    return `<div class="vp-dia"><h4>${esc(fechaLarga(f))}</h4>
+      ${conF.map(tarjetaSec).join("") || `<div class="vp-sec vacia">Ninguno da fuego este día</div>`}
+      <div class="vp-resto">${sinF.map(tarjetaSec).join("")}</div></div>`;
+  }).join("");
+
   $("#vista").innerHTML = `
-    <section class="heroe">
+    <section class="heroe vp-heroe">
       <div>
-        <div class="eyebrow">✦ Los ${d.cuantos} más fuertes en 1ra · ${d.loterias.length} loterías juntas</div>
+        <div class="eyebrow">✦ 1er premio · ${d.loterias.length} loterías juntas</div>
         <h2>Público y VIP</h2>
-        <div class="sub">${esc(fechaLarga(d.fecha))} · las ${d.cuantos} parejas número-inverso más fuertes en 1er premio sumando
-          ${esc(d.loterias.map((l) => l.nombre).join(", "))}</div>
+        <div class="sub">${esc(fechaLarga(d.fecha))}</div>
         <div class="nav-fecha">
           <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
           <input type="date" id="fecha" value="${esc(d.fecha)}" max="${esc(d.hoy)}">
@@ -1262,58 +1551,242 @@ async function vistaVip(fecha) {
           ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
         </div>
         <div class="cifras">
+          <div class="cifra oro"><b>${p.publico.primera.aciertos}<small> / ${p.publico.primera.esperado.toFixed(0)}</small></b><span>1ros premios del Público en ${d.dias_prueba} días (real / azar)</span></div>
+          <div class="cifra oro"><b>${p.vip.primera.aciertos}<small> / ${p.vip.primera.esperado.toFixed(0)}</small></b><span>1ros premios del VIP en ${d.dias_prueba} días (real / azar)</span></div>
           <div class="cifra"><b>${d.sorteos.toLocaleString("es-DO")}</b><span>sorteos contados</span></div>
-          <div class="cifra"><b>${meses}<small> meses</small></b><span>de datos (desde ${esc(fechaMini(d.desde))})</span></div>
-          <div class="cifra oro"><b>${p.publico.primera.aciertos}<small> / ${p.publico.primera.esperado.toFixed(0)}</small></b><span>1ros premios Público en ${d.dias_prueba} días (vs azar)</span></div>
-          <div class="cifra oro"><b>${p.vip.primera.aciertos}<small> / ${p.vip.primera.esperado.toFixed(0)}</small></b><span>1ros premios VIP en ${d.dias_prueba} días (vs azar)</span></div>
+          <div class="cifra"><b>${meses}<small> meses</small></b><span>de datos, desde ${esc(fechaMini(d.desde))}</span></div>
         </div>
       </div>
-      <div class="vision">
-        <span class="etiqueta">Público · las ${d.cuantos_publico} más fuertes en 1ra</span>
-        <div class="grande">${bolas([...publico], "oro")}</div>
-        <span class="etiqueta">VIP · las otras ${d.cuantos - d.cuantos_publico}</span>
-        <div class="grande">${bolas([...vip], "oro")}</div>
-        <p class="nota">${d.resultados.length ? `1er premio acertado: Público en ${plural(en1ra("publico"), "lotería", "loterías")} · VIP en ${plural(en1ra("vip"), "lotería", "loterías")}
-          de las ${d.resultados.length} ya sorteadas.` : "Se juega en cualquiera de las loterías."}</p>
+      <div class="vp-jugada">
+        <div class="vp-grupo">
+          <span class="etiqueta">Público</span>
+          <div class="vp-pares cuatro">${d.publico.map((x) => parVip(x, fuego)).join("")}</div>
+        </div>
+        <div class="vp-grupo">
+          <span class="etiqueta">VIP</span>
+          <div class="vp-pares tres">${d.vip.map((x) => parVip(x, fuego)).join("")}</div>
+        </div>
+        <div class="vp-leyenda">
+          ${fuego.size ? `<span>🔥 <b>${fuego.size}</b> de ${total} también los abre el Libro oculto</span>` : `<span>Hoy el Libro oculto no coincide con ninguno</span>`}
+          ${d.resultados.length ? `<span>1ra acertada: Público ${en1ra("publico")} · VIP ${en1ra("vip")} de ${d.resultados.length} sorteadas</span>` : ""}
+        </div>
       </div>
     </section>
 
-    <div class="panel">
-      ${d.completo ? "" : `<div class="aviso">Solo hay resultados guardados desde el ${esc(fechaLarga(d.desde))}
-        (${meses} meses); el cálculo irá cubriendo los ${d.años} años a medida que se guarden.</div>`}
-      <p class="nota"><b>Cómo funciona.</b> Se suman los últimos ${d.años} años de las ${d.loterias.length} loterías como si fueran una sola,
-        y un número y su inverso cuentan como el mismo (15 y 51). Solo cuentan las veces que la pareja salió de <b>1er premio</b>,
-        y lo reciente pesa más: un 1er premio de hace ${d.vida_primera} días vale la mitad que uno de ayer.
-        Las ${d.cuantos_publico} parejas más fuertes son del <b>Público</b> y las ${d.cuantos - d.cuantos_publico} siguientes del <b>VIP</b>.
-        La bola grande es la que más pesa en 1ra; la pequeña, su inverso.</p>
-      <p class="nota"><b>Probabilidad en 1ra</b>: con ese peso, en qué parte de los sorteos la pareja fue el 1er premio.
-        Lo normal es 2 % (1 % si el número es doble).</p>
-    </div>
+    <details class="panel vp-explica">
+      <summary>¿Cómo se escogen estos números?</summary>
+      ${d.completo ? "" : `<p class="nota vp-aviso">Solo hay resultados desde el ${esc(fechaLarga(d.desde))} (${meses} meses);
+        el cálculo irá cubriendo los ${d.años} años a medida que se guarden.</p>`}
+      <ul>
+        <li>Se suman los últimos <b>${d.años} años</b> de estas ${d.loterias.length} loterías como si fueran una sola:
+          ${esc(d.loterias.map((l) => nombreCorto(l.nombre)).join(", "))}.</li>
+        <li>Un número y su inverso cuentan como uno (15 y 51), y solo cuenta cuando salió de <b>1er premio</b>.</li>
+        <li>Lo reciente pesa más: un 1er premio de hace ${d.vida_primera} días vale la mitad que uno de ayer.</li>
+        <li>Las <b>${d.cuantos_publico}</b> parejas más fuertes son del <b>Público</b>; las <b>${d.cuantos - d.cuantos_publico}</b> siguientes, del <b>VIP</b>.
+          La bola grande es la que más pesa en 1ra y la pequeña es su inverso.</li>
+        <li><b>Probabilidad en 1ra</b>: qué parte de los sorteos la pareja fue el 1er premio. Lo normal es 2 % (1 % si es doble).</li>
+        <li>🔥 <b>Libro oculto</b>: se miran los 1ros premios de los últimos ${d.oculto.dias} días. Si uno es el primer número de una
+          secuencia del libro, se abren los que le siguen (cada uno con su inverso, 75 y 57). Si coincide con el Público o el VIP, lleva fuego.</li>
+      </ul>
+    </details>
 
-    <h3 class="titulo">Público <small>las ${d.cuantos_publico} más fuertes en 1ra</small></h3>
-    ${d.publico.length ? parejasVip(d.publico, 0) : `<div class="vacio panel">No hay datos de estas loterías.</div>`}
+    <h3 class="titulo">Público <small>las ${d.cuantos_publico} parejas más fuertes en 1ra</small></h3>
+    ${d.publico.length ? `<div class="vp-cards">${d.publico.map((x, i) => tarjetaVip(x, i, "publico", maximo, fuego)).join("")}</div>`
+      : `<div class="vacio panel">No hay datos de estas loterías.</div>`}
 
     <h3 class="titulo">VIP <small>las ${d.cuantos - d.cuantos_publico} siguientes</small></h3>
-    ${d.vip.length ? parejasVip(d.vip, d.cuantos_publico) : `<div class="vacio panel">No hay datos de estas loterías.</div>`}
+    ${d.vip.length ? `<div class="vp-cards">${d.vip.map((x, i) => tarjetaVip(x, d.cuantos_publico + i, "vip", maximo, fuego)).join("")}</div>`
+      : `<div class="vacio panel">No hay datos de estas loterías.</div>`}
 
     ${d.resultados.length ? `<h3 class="titulo">Resultados del día <small>en verde, los de la jugada · el primero es el 1er premio</small></h3>
-    <div class="panel"><div class="siete">${d.resultados.map((r) => `<div class="jugadas-ind">
-      <div><a href="${enlaceLoteria(r.nombre)}">${esc(r.nombre)}</a>
+    <div class="vp-resultados">${d.resultados.map((r) => `<div class="vp-res${r.primera ? " gano" : ""}">
+        <a href="${enlaceLoteria(r.nombre)}">${esc(nombreCorto(r.nombre))}</a>
         <div class="bolas">${r.numeros.map((n) => bolaChica(n, publico.has(n) || vip.has(n))).join("")}</div>
-        ${r.primera ? `<span class="master">★ 1ra ${r.primera === "publico" ? "Público" : "VIP"}</span>` : ""}</div></div>`).join("")}</div></div>` : ""}
+        ${r.primera ? `<span class="vp-tag ${r.primera}">★ 1ra ${r.primera === "publico" ? "Público" : "VIP"}</span>` : ""}
+      </div>`).join("")}</div>` : ""}
+
+    <h3 class="titulo">Libro oculto <small>lo que abrieron los 1ros premios de los últimos ${d.oculto.dias} días</small></h3>
+    ${columnas ? `<div class="panel">
+        <p class="nota vp-nota-libro">Cada tarjeta es un 1er premio y debajo están los números que abre su secuencia.
+          <span class="si-muestra">Así</span> se marcan los que también están en el Público o el VIP.
+          Se mira en ${esc(d.oculto.loterias.map(nombreCorto).join(", "))}.</p>
+        <div class="vp-dias" id="vp-dias">${columnas}</div>
+        ${resto ? `<button class="vp-ver" id="vp-ver">Ver los otros ${resto} primeros premios (sin fuego)</button>` : ""}</div>`
+      : `<div class="vacio panel">Ningún 1er premio de estos días abre secuencias del libro.</div>`}
 
     <h3 class="titulo">¿Cómo le ha ido? <small>últimos ${d.dias_prueba} días, sin ver el futuro</small></h3>
     <div class="panel">
-      <div class="kpis">${kpisVip("Público", p.publico, p.sorteos)}${kpisVip("VIP", p.vip, p.sorteos)}</div>
+      <div class="vp-rinden">${resumenVip("Público", p.publico, p.sorteos)}${resumenVip("VIP", p.vip, p.sorteos)}</div>
       <p class="nota">Cada día se sacaron las ${d.cuantos} parejas con lo que había hasta el día anterior y se jugaron en las
-        ${d.loterias.length} loterías, el número y su inverso. Cada número jugado tiene 1 % de ser el 1er premio por azar.
-        Z entre −2 y +2 es suerte normal.</p>
+        ${d.loterias.length} loterías, el número y su inverso. Barra dorada: lo que pasó; barra gris: lo que daría el azar.
+        Cada número jugado tiene 1 % de ser el 1er premio por azar.</p>
     </div>`;
 
   $("#ant").onclick = () => ir(`vip/${d.anterior}`);
   $("#sig").onclick = () => ir(`vip/${d.siguiente}`);
   $("#fecha").onchange = (e) => e.target.value && ir(`vip/${e.target.value}`);
   if ($("#hoy")) $("#hoy").onclick = () => ir("vip");
+  if ($("#vp-ver")) $("#vp-ver").onclick = (e) => {
+    const abierto = $("#vp-dias").classList.toggle("todos");
+    e.target.textContent = abierto ? "Ocultar los que no dan fuego" : `Ver los otros ${resto} primeros premios (sin fuego)`;
+  };
+}
+
+// ------------------------------------------------------------- Laboratorio
+
+const ESTADO_VIG = { justa: "Pareja", vigilar: "Vigilar", sesgo: "Sesgo confirmado" };
+
+// Barra de Z: −3 a +3, con la zona de suerte normal (±2) sombreada y la meta exigida
+function barraZ(z, exigido) {
+  const pos = (v) => 50 + Math.max(-3.5, Math.min(3.5, v)) / 3.5 * 50;
+  const desde = Math.min(pos(0), pos(z)), ancho = Math.abs(pos(z) - pos(0));
+  return `<div class="lab-z" title="Z = ${z.toFixed(2)}">
+    <span class="zona" style="left:${pos(-2)}%;width:${pos(2) - pos(-2)}%"></span>
+    <span class="meta" style="left:${pos(exigido)}%"></span>
+    <span class="cero"></span>
+    <span class="valor ${z >= exigido ? "gana" : z < 0 ? "baja" : ""}" style="left:${desde}%;width:${ancho}%"></span>
+    <span class="punto ${z >= exigido ? "gana" : z < 0 ? "baja" : ""}" style="left:${pos(z)}%"></span>
+  </div>`;
+}
+
+function filaVigilante(v) {
+  // qué tan rara es la lotería: −log10(p), con la línea en el límite exigido
+  const rareza = (p) => Math.min(-Math.log10(Math.max(p, 1e-9)), 6);
+  const tope = Math.max(rareza(v.limite) * 1.3, 2.2);
+  return `<div class="lab-vig ${v.estado}">
+    <div class="lab-vig-nom"><a href="${enlaceLoteria(v.loteria)}">${esc(v.loteria)}</a><small>${v.sorteos} sorteos</small></div>
+    <div class="lab-rareza" title="p = ${v.p}">
+      <span class="lleno" style="width:${100 * rareza(v.p) / tope}%"></span>
+      <span class="linea" style="left:${100 * rareza(0.05) / tope}%" title="p = 0.05"></span>
+      <span class="linea fuerte" style="left:${100 * rareza(v.limite) / tope}%" title="límite exigido"></span>
+    </div>
+    <span class="lab-estado ${v.estado}">${ESTADO_VIG[v.estado]}</span>
+  </div>`;
+}
+
+async function vistaLaboratorio(fecha) {
+  $("#vista").innerHTML = `<div class="vacio panel">🔬 Corriendo todos los métodos y revisando todas las loterías… (puede tardar unos segundos)</div>`;
+  const d = await api(`/api/laboratorio${fecha ? `?fecha=${encodeURIComponent(fecha)}` : ""}`);
+  // verde si sale de 1ra el número o su inverso (20 o 02)
+  for (const c of d.consenso) { c.inv_primera = c.inv_primera || []; c.inv_donde = c.inv_donde || []; }
+  const gano = (c) => c.en_primera.length > 0 || c.inv_primera.length > 0;
+  const salio = (c) => gano(c) ? "acierto" : "oro";
+  const estadoConsenso = (c) => {
+    const lineas = [];
+    if (c.en_primera.length) lineas.push(`<div class="vp-estado acierto">✓ ${esc(c.numero)} de 1ra en ${c.en_primera.map(esc).join(", ")}</div>`);
+    if (c.inv_primera.length) lineas.push(`<div class="vp-estado acierto">✓ Su inverso ${esc(c.inverso)} de 1ra en ${c.inv_primera.map(esc).join(", ")}</div>`);
+    if (!lineas.length) {
+      const otros = [...c.donde.map((l) => `${esc(c.numero)} en ${esc(l)}`), ...c.inv_donde.map((l) => `${esc(c.inverso)} en ${esc(l)}`)];
+      if (otros.length) lineas.push(`<div class="vp-estado">Salió ${otros.join(" · ")}</div>`);
+    }
+    return lineas.join("");
+  };
+  const hayRes = d.resultados.length > 0;
+  const maxVotos = Math.max(...d.consenso.map((c) => c.votos), 1);
+  const raras = d.vigilante.filter((v) => v.estado !== "justa").length;
+  const VISIBLES = 10;
+
+  const veredicto = d.sesgos
+    ? `<div class="lab-veredicto alerta"><b>🚨 ${plural(d.sesgos, "lotería tiene", "loterías tienen")} un sesgo confirmado.</b>
+        Sus números salen de más en datos que no se usaron para encontrarlos. Mira El Vigilante abajo.</div>`
+    : d.ganadores.length
+      ? `<div class="lab-veredicto alerta"><b>📈 ${d.ganadores.map(esc).join(", ")} le está ganando al azar</b> con más fuerza
+          de la que da la suerte (Z ≥ ${d.z_exigido}). Hay que ver si se mantiene con días nuevos.</div>`
+      : `<div class="lab-veredicto"><b>🧪 Veredicto de hoy: todo es azar.</b> Ninguna de las ${d.vigilante.length} loterías tiene la
+          máquina desbalanceada y ninguno de los ${d.verdad.length} métodos le gana al azar. La jugada de consenso es la más
+          respaldada por tus métodos, pero tiene la misma probabilidad que cualquier otro número: 1 % de ser el 1er premio en
+          cada sorteo. El Vigilante seguirá revisando cada día y te avisará aquí si eso cambia.</div>`;
+
+  $("#vista").innerHTML = `
+    <section class="heroe lab-heroe">
+      <div>
+        <div class="eyebrow">✦ Método científico · ${d.metodos} métodos + El Vigilante</div>
+        <h2>Laboratorio</h2>
+        <div class="sub">${esc(fechaLarga(d.fecha))}</div>
+        <div class="nav-fecha">
+          <button id="ant" title="Día anterior">‹ Anterior</button>
+          <input type="date" id="fecha" value="${esc(d.fecha)}" max="${esc(d.hoy)}">
+          <button id="sig" ${d.siguiente ? "" : "disabled"} title="Día siguiente">Siguiente ›</button>
+          ${d.fecha !== d.hoy ? `<button id="hoy">Hoy</button>` : ""}
+        </div>
+        <div class="cifras">
+          <div class="cifra"><b>${d.metodos}</b><span>métodos consultados</span></div>
+          <div class="cifra"><b>${d.vigilante.length}</b><span>loterías vigiladas</span></div>
+          <div class="cifra ${d.sesgos ? "oro" : ""}"><b>${d.sesgos}</b><span>sesgos confirmados</span></div>
+          <div class="cifra ${d.ganadores.length ? "oro" : ""}"><b>${d.ganadores.length}<small> / ${d.verdad.length}</small></b><span>métodos que le ganan al azar</span></div>
+        </div>
+      </div>
+      <div class="lab-jugada">
+        <span class="etiqueta">Jugada de consenso</span>
+        <div class="lab-bolas">${d.consenso.map((c) => `<span class="bola ${salio(c)}" title="${c.votos} de ${d.metodos} métodos">${esc(c.numero)}</span>`).join("")}</div>
+        <p class="nota">Los ${d.consenso.length} números en que más métodos coinciden (en verde si sale de 1ra el número o su inverso).
+          ${(() => { const n = d.consenso.filter(gano).length;
+            return !hayRes ? "Se juegan en cualquiera de las loterías del VIP."
+              : n ? `Hoy ${n === 1 ? "salió 1" : `salieron ${n}`} de 1ra.` : "Hoy ninguno ha salido de 1ra."; })()}</p>
+      </div>
+    </section>
+
+    ${veredicto}
+
+    <h3 class="titulo">Jugada de consenso <small>cuántos de los ${d.metodos} métodos recomiendan cada número hoy</small></h3>
+    <div class="lab-consenso">${d.consenso.map((c, i) => `<div class="lab-voto${gano(c) ? " gano" : ""}">
+        <span class="romano-vp">${ROMANOS[i]}</span>
+        <span class="bola ${salio(c)}">${esc(c.numero)}</span>
+        <div class="lab-voto-info">
+          <div class="lab-voto-cab"><b>${c.votos} de ${d.metodos}</b> métodos</div>
+          <span class="peso"><span style="width:${100 * c.votos / maxVotos}%"></span></span>
+          <div class="lab-chips">${c.metodos.map((m) => `<span>${esc(m)}</span>`).join("")}</div>
+          ${estadoConsenso(c)}
+        </div>
+      </div>`).join("")}</div>
+
+    <h3 class="titulo">El Vigilante <small>¿alguna máquina saca unos números más que otros?</small></h3>
+    <div class="panel">
+      <p class="nota lab-intro">Cada lotería se revisa con todo su historial. La barra mide <b>qué tan rara</b> es: si pasa la
+        primera raya (p = 0.05) se pone en <b>vigilar</b>, pero con ${d.vigilante.length} loterías unas ${Math.round(d.vigilante.length * 0.05)}
+        pasan por pura suerte. Para ser <b>sesgo confirmado</b> tiene que pasar la raya gruesa y, además, sus números más salidos
+        en la primera mitad del historial tienen que seguir saliendo de más en la segunda mitad.
+        Hoy: ${plural(raras, "lotería para vigilar", "loterías para vigilar")} y ${plural(d.sesgos, "sesgo confirmado", "sesgos confirmados")}.</p>
+      <div class="lab-vigs" id="lab-vigs">
+        ${d.vigilante.slice(0, VISIBLES).map(filaVigilante).join("")}
+        <div class="lab-mas">${d.vigilante.slice(VISIBLES).map(filaVigilante).join("")}</div>
+      </div>
+      ${d.vigilante.length > VISIBLES ? `<button class="vp-ver" id="lab-ver">Ver las otras ${d.vigilante.length - VISIBLES} loterías</button>` : ""}
+    </div>
+
+    <h3 class="titulo">Tabla de la verdad <small>cada método contra el azar · últimos ${d.dias_prueba} días, sin ver el futuro</small></h3>
+    <div class="panel">
+      <div class="lab-verdad">${d.verdad.map((v) => `<div class="lab-fila">
+          <div class="lab-met"><a href="#${esc(v.enlace)}">${esc(v.metodo)}</a><small>${esc(v.mide)}</small></div>
+          <div class="lab-cuenta"><b>${v.aciertos}</b><small>de ${Number(v.esperado).toFixed(0)} del azar</small></div>
+          ${barraZ(v.z, d.z_exigido)}
+          <span class="lab-zv ${v.z >= d.z_exigido ? "gana" : v.z < 0 ? "baja" : ""}">${v.z >= 0 ? "+" : ""}${v.z.toFixed(2)}</span>
+        </div>`).join("")}</div>
+      <div class="lab-leyenda"><span><i class="zona"></i> zona de suerte normal (Z entre −2 y +2)</span>
+        <span><i class="meta"></i> lo que tiene que pasar para ganarle al azar con ${d.verdad.length} métodos (Z ≥ ${d.z_exigido})</span></div>
+    </div>
+
+    <details class="panel vp-explica">
+      <summary>Lo que aprendimos estudiando todo el historial</summary>
+      <ul>
+        <li>En 171 días, el Público y VIP acertó 238 primeros premios de 23,640 intentos: <b>1.01 %</b>. El azar da 1 %.</li>
+        <li>Con 🔥 salieron de 1ra el <b>1.03 %</b> de las veces y sin 🔥 el <b>0.97 %</b>: no hay diferencia real. 58 de 200 libros
+          inventados al azar dieron una "ventaja" igual o mayor.</li>
+        <li>Los números <b>calientes</b> (los más salidos) salieron de 1ra el 0.86 % de las veces; los <b>fríos</b>, igual que el resto.
+          Lo que sale en una mitad del historial no dice nada de la otra mitad.</li>
+        <li>Si pruebas muchas versiones de un método, alguna parece buena por suerte. Por eso aquí se exige Z ≥ ${d.z_exigido} y no solo 2.</li>
+        <li>La única ventaja real posible es una máquina desbalanceada. Por eso El Vigilante revisa todas las loterías cada día.</li>
+      </ul>
+    </details>`;
+
+  $("#ant").onclick = () => ir(`laboratorio/${d.anterior}`);
+  $("#sig").onclick = () => ir(`laboratorio/${d.siguiente}`);
+  $("#fecha").onchange = (e) => e.target.value && ir(`laboratorio/${e.target.value}`);
+  if ($("#hoy")) $("#hoy").onclick = () => ir("laboratorio");
+  if ($("#lab-ver")) $("#lab-ver").onclick = (e) => {
+    const abierto = $("#lab-vigs").classList.toggle("todos");
+    e.target.textContent = abierto ? "Ver menos" : `Ver las otras ${d.vigilante.length - VISIBLES} loterías`;
+  };
 }
 
 // ------------------------------------------------------------- La Fórmula
