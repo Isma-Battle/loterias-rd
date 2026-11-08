@@ -28,6 +28,9 @@ y pide los datos a estas rutas (todas devuelven JSON):
                                          qué loterías de ese día han salido más de 1er premio
     GET  /api/laboratorio?fecha=...      Laboratorio: los números en que más métodos coinciden, El Vigilante
                                          (busca máquinas sesgadas) y la tabla de la verdad de cada método
+    GET  /api/compartir?metodo=...&fecha=...  los números de un método en filas, para la imagen de WhatsApp
+    GET  /flyer_gratis.jpg, /flyer_vip.jpg   los flyers del Público y VIP (se les cambian números y fecha)
+    GET  /plantilla.png                  la imagen modelo para compartir (loterias/web/plantilla.png), si existe
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
@@ -961,6 +964,112 @@ def _prueba_fuego(con, fecha: date) -> dict:
 
 _cache_fuego: dict = {}
 
+# ------------------------------------------------------- Compartir (imagen)
+
+PLANTILLA = Path(__file__).resolve().parent / "web" / "plantilla.png"
+# Los flyers del Público y VIP: la app tapa los números y la fecha viejos y escribe los del día
+FLYERS = {"/flyer_gratis.jpg": "flyer_gratis.jpg", "/flyer_vip.jpg": "flyer_vip.jpg",
+          "/flyer_bingo.jpg": "flyer_bingo.jpg"}  # el de aciertos del Público (BINGO)
+# Las letras de los flyers van dentro del proyecto para que funcionen sin depender de internet
+FUENTES = {"/fuentes/archivo-black.woff2": "fuentes/archivo-black.woff2",
+           "/fuentes/barlow-condensed-800.woff2": "fuentes/barlow-condensed-800.woff2"}
+MAX_FILAS = 10   # filas que caben en la imagen
+MAX_NUMEROS = 8  # números por fila
+
+NOMBRE_METODO = {
+    "oraculo": "El Oráculo", "indicadas": "Loterías indicadas", "fuertes": "Los 7 más fuertes",
+    "master": "Master", "king": "Master King", "raya": "3 en raya", "josefina": "Josefina",
+    "vip": "Público y VIP", "laboratorio": "Laboratorio", "formula": "La Fórmula",
+}
+
+
+def _fila(titulo: str, numeros, fuego=()) -> dict:
+    nums = list(dict.fromkeys(n for n in numeros if n))[:MAX_NUMEROS]
+    return {"titulo": titulo, "numeros": nums, "fuego": [n for n in nums if n in set(fuego)]}
+
+
+def compartir(con, metodo: str, fecha: date) -> dict | None:
+    """Los números recomendados de un método, en filas cortas listas para dibujar en una imagen."""
+    def par(x):
+        return [x["numero"]] + ([x["inverso"]] if x.get("inverso") and x["inverso"] != x["numero"] else [])
+    filas: list[dict] = []
+    nota = ""
+    flyer = None
+    if metodo == "oraculo":
+        r = recomendaciones(con, fecha)
+        if not r:
+            return None
+        por_lot: dict[str, list[str]] = {}
+        for x in r["destacados"]:
+            por_lot.setdefault(x["loteria"], []).append(x["numero"])
+        filas = [_fila(l, ns) for l, ns in por_lot.items()]
+    elif metodo == "indicadas":
+        r = indicadas(con, fecha)
+        if not r:
+            return None
+        filas = [_fila(l["nombre"], [j["numero"] for j in l["jugadas"]]) for l in r["loterias"]]
+    elif metodo == "fuertes":
+        r = fuertes(con, fecha)
+        if not r:
+            return None
+        filas = [_fila(l["nombre"], [x["numero"] for x in l["numeros"]]) for l in r["loterias"]]
+        nota = "Cada número se juega con su inverso"
+    elif metodo == "master":
+        r = master(con, fecha)
+        if not r:
+            return None
+        filas = [_fila(l["nombre"], [x["numero"] for x in l["ranking"]]) for l in r["loterias"]]
+    elif metodo == "king":
+        r = master_king(con, fecha)
+        if not r:
+            return None
+        filas = [_fila(l["nombre"], [x["numero"] for x in l["numeros"]]) for l in r["loterias"]]
+    elif metodo == "raya":
+        r = tres_en_raya(con, fecha)
+        if not r:
+            return None
+        filas = [_fila("Jugada", [n for x in r["numeros"] for n in par(x)])]
+        filas += [_fila(a["nombre"], [n for c in a["campos"] for n in c["siguen"]]) for a in r["abiertos"]]
+    elif metodo == "josefina":
+        r = josefina(con, fecha)
+        if not r:
+            return None
+        filas = [_fila(l["nombre"], [x["numero"] for x in l["numeros"]]) for l in r["loterias"]]
+        nota = "Cada número se juega con su V (al revés)"
+    elif metodo == "vip":
+        r = publico_vip(con, fecha)
+        if not r:
+            return None
+        fuego = r.get("oculto", {}).get("fuego", [])
+        filas = [_fila("Público", [n for x in r["publico"] for n in par(x)], fuego),
+                 _fila("VIP", [n for x in r["vip"] for n in par(x)], fuego)]
+        nota = "🔥 también los abre el Libro oculto" if fuego else ""
+        # para los flyers: la bola grande de cada pareja (Grupo Gratis = Público, Grupo VIP = VIP)
+        flyer = {"gratis": [x["numero"] for x in r["publico"]], "vip": [x["numero"] for x in r["vip"]]}
+        # aciertos del Público ese día: solo cuando uno de sus números (o su inverso) salió de 1ra
+        jugados = {n for x in r["publico"] for n in par(x)}
+        flyer["aciertos"] = [{"loteria": res["nombre"], "numeros": res["numeros"], "acierto": res["numeros"][0],
+                              "premio": 1}
+                             for res in r["resultados"] if res["numeros"] and res["numeros"][0] in jugados]
+    elif metodo == "laboratorio":
+        r = laboratorio(con, fecha)
+        if not r:
+            return None
+        filas = [_fila("Consenso", [c["numero"] for c in r["consenso"]])]
+        nota = f"Los números en que más coinciden {r['metodos']} métodos"
+    elif metodo == "formula":
+        r = la_formula(con, fecha)
+        if not r:
+            return None
+        filas = [_fila("Fórmula", [x["numero"] for x in r["origen"]["formula"]])]
+        elegidas = [d["nombre"] for d in r["destinos"] if d.get("elegida")]
+        nota = f"Juégalos en: {', '.join(elegidas)}" if elegidas else ""
+    else:
+        return None
+    filas = [f for f in filas if f["numeros"]][:MAX_FILAS]
+    return {"metodo": NOMBRE_METODO[metodo], "clave": metodo, "fecha": r["fecha"], "filas": filas, "nota": nota,
+            "plantilla": PLANTILLA.exists(), "flyer": flyer}
+
 
 def laboratorio(con, fecha: date) -> dict | None:
     """Jugada de consenso de todos los métodos, El Vigilante (sesgos en las máquinas) y la
@@ -1308,6 +1417,14 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
             q = {k: v[0] for k, v in parse_qs(url.query).items()}
             if url.path in ("/", "/index.html"):
                 return self._responder(200, PAGINA.read_bytes(), "text/html; charset=utf-8")
+            if url.path in FUENTES:
+                return self._responder(200, (PAGINA.parent / FUENTES[url.path]).read_bytes(), "font/woff2")
+            if url.path in FLYERS:
+                return self._responder(200, (PAGINA.parent / FLYERS[url.path]).read_bytes(), "image/jpeg")
+            if url.path == "/plantilla.png":
+                if not PLANTILLA.exists():
+                    return self._json({"error": "No hay plantilla"}, 404)
+                return self._responder(200, PLANTILLA.read_bytes(), "image/png")
             con = db.conectar(ruta_db)
             try:
                 if url.path == "/api/resumen":
@@ -1380,6 +1497,15 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     datos = publico_vip(con, fecha)
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
+                    return self._json(datos)
+                if url.path == "/api/compartir":
+                    try:
+                        fecha = date.fromisoformat(q.get("fecha", ""))
+                    except ValueError:
+                        fecha = datetime.now(recolector.ZONA_RD).date()
+                    datos = compartir(con, q.get("metodo", ""), fecha)
+                    if datos is None:
+                        return self._json({"error": "No hay números para ese método"}, 404)
                     return self._json(datos)
                 if url.path == "/api/laboratorio":
                     try:

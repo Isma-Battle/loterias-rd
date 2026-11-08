@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+  /* letras de los flyers del Público y VIP (dentro del proyecto) */
+  @font-face { font-family: "Archivo Black"; src: url("/fuentes/archivo-black.woff2") format("woff2"); font-display: swap; }
+  @font-face { font-family: "Barlow Condensed"; font-weight: 800; src: url("/fuentes/barlow-condensed-800.woff2") format("woff2"); font-display: swap; }
   :root {
     --noche: #06060c;
     --noche-2: #0c0e1d;
@@ -527,6 +530,28 @@
     .lab-voto .romano-vp { display: none; }
   }
 
+  /* ------------------------------------------------ Imagen para WhatsApp */
+  .btn-wa { border-color: rgba(37, 211, 102, .55) !important; color: #b9f5cf !important; background: rgba(37, 211, 102, .1) !important; }
+  .btn-wa:hover { background: rgba(37, 211, 102, .2) !important; }
+  .wa-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px;
+    background: rgba(3, 3, 8, .78); backdrop-filter: blur(6px); }
+  .wa-caja { position: relative; width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 14px;
+    padding: 20px; border-radius: 24px; border: 1px solid var(--borde-fuerte); background: var(--panel-solido);
+    box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .wa-caja h3 { margin: 0; font: 600 17px var(--display); letter-spacing: .04em; color: var(--oro); }
+  .wa-cerrar { position: absolute; top: 14px; right: 14px; padding: 6px 11px; }
+  .wa-vista img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--borde); }
+  .wa-vista .vacio { padding: 80px 16px; }
+  .wa-botones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .wa-descargar { font: 500 14px/1 var(--texto); color: var(--marfil); text-decoration: none; border: 1px solid var(--borde);
+    border-radius: 999px; padding: 9px 16px; }
+  .wa-descargar:hover { border-color: var(--borde-fuerte); background: var(--panel-2); }
+  .wa-ayuda { margin: 0; text-align: center; }
+  .wa-lista { display: grid; gap: 18px; }
+  .wa-pieza { display: grid; gap: 10px; }
+  .wa-pieza h4 { margin: 0; font: 600 13px var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--tenue); }
+  .wa-todas:empty { display: none; }
+
   footer { max-width: 1240px; margin: 0 auto; padding: 0 20px 40px; }
   footer p { font-size: 12.5px; color: var(--muy-tenue); text-align: center; line-height: 1.7; margin: 0; }
 
@@ -690,6 +715,7 @@ async function mostrar() {
     else if (vista === "formula") await vistaFormula(param);
     else if (vista === "dia") await vistaDia(param || resumen.hasta);
     else await vistaOraculo(param);
+    botonCompartir(vista);
   } catch (e) {
     aviso(`No se pudieron cargar los datos: ${e.message}. ¿Está corriendo "python main.py web"?`, true);
   }
@@ -1630,6 +1656,415 @@ async function vistaVip(fecha) {
     const abierto = $("#vp-dias").classList.toggle("todos");
     e.target.textContent = abierto ? "Ocultar los que no dan fuego" : `Ver los otros ${resto} primeros premios (sin fuego)`;
   };
+}
+
+// ------------------------------------------------- Imagen para WhatsApp
+
+const METODOS_COMPARTIR = ["oraculo", "indicadas", "fuertes", "master", "king", "raya", "josefina", "vip", "laboratorio", "formula"];
+const IMG = { ancho: 1080, alto: 1350, margen: 70 };
+
+// Pone el botón "Compartir por WhatsApp" en la barra de fecha de cada método
+function botonCompartir(vista) {
+  const barra = $(".nav-fecha");
+  if (!barra || !METODOS_COMPARTIR.includes(vista) || $("#compartir")) return;
+  const b = document.createElement("button");
+  b.id = "compartir";
+  b.className = "btn-wa";
+  b.innerHTML = "📲 Imagen para WhatsApp";
+  b.onclick = () => abrirCompartir(vista, $("#fecha") ? $("#fecha").value : "");
+  barra.appendChild(b);
+}
+
+function cargarImagen(src) {
+  return new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = src; });
+}
+
+function bolaCanvas(ctx, x, y, s, n, fuego) {
+  const r = s / 2, cx = x + r, cy = y + r;
+  ctx.save();
+  ctx.shadowColor = "rgba(243, 207, 118, .45)"; ctx.shadowBlur = s * .25;
+  const g = ctx.createRadialGradient(cx - r * .36, cy - r * .5, r * .05, cx, cy, r);
+  g.addColorStop(0, "#fffaf0"); g.addColorStop(.2, "#f8dc8e"); g.addColorStop(.58, "#dcaa4a"); g.addColorStop(1, "#8a6420");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "#2b1c03";
+  ctx.font = `700 ${Math.round(s * .44)}px Cinzel, Georgia, serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(n, cx, cy + s * .03);
+  if (fuego) {
+    ctx.font = `${Math.round(s * .34)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.fillText("🔥", x + s * .9, y + s * .1);
+  }
+}
+
+// Reparte las filas en el espacio: busca el tamaño de bola más grande que quepa
+function medirFilas(filas, ancho, alto) {
+  for (const s of [170, 150, 132, 116, 102, 90, 80, 70, 62, 54, 48]) {
+    const gap = Math.round(s * .2), porLinea = Math.max(1, Math.floor((ancho + gap) / (s + gap)));
+    const etiqueta = Math.round(Math.max(24, s * .3));
+    const total = filas.reduce((t, f) => t + etiqueta + 10 + Math.ceil(f.numeros.length / porLinea) * (s + gap) + s * .18, 0);
+    if (total <= alto) return { s, gap, porLinea, etiqueta, total };
+  }
+  return { s: 44, gap: 8, porLinea: Math.floor((ancho + 8) / 52), etiqueta: 22, total: alto };
+}
+
+async function dibujarImagen(d) {
+  const { ancho: W, alto: H, margen: M } = IMG;
+  const lienzo = document.createElement("canvas");
+  lienzo.width = W; lienzo.height = H;
+  const ctx = lienzo.getContext("2d");
+  try { await Promise.all([document.fonts.load("700 60px Cinzel"), document.fonts.load("600 30px Inter")]); } catch { /* sin fuentes */ }
+
+  // Fondo: la plantilla del usuario si existe; si no, el diseño de la página
+  let plantilla = null;
+  if (d.plantilla) { try { plantilla = await cargarImagen(`/plantilla.png?v=${Date.now()}`); } catch { plantilla = null; } }
+  if (plantilla) {
+    const k = Math.max(W / plantilla.width, H / plantilla.height);
+    ctx.drawImage(plantilla, (W - plantilla.width * k) / 2, (H - plantilla.height * k) / 2, plantilla.width * k, plantilla.height * k);
+  } else {
+    const f = ctx.createLinearGradient(0, 0, 0, H);
+    f.addColorStop(0, "#14122b"); f.addColorStop(1, "#06060c");
+    ctx.fillStyle = f; ctx.fillRect(0, 0, W, H);
+    for (const [x, y, r, c] of [[W * .1, 0, 700, "rgba(139,108,255,.22)"], [W * .95, H * .1, 650, "rgba(243,207,118,.16)"], [W * .5, H, 700, "rgba(56,226,160,.06)"]]) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, c); g.addColorStop(1, "transparent");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    ctx.fillStyle = "rgba(255,255,255,.5)";
+    for (let i = 0; i < 90; i++) { ctx.globalAlpha = .15 + (i % 5) * .08; ctx.fillRect((i * 397) % W, (i * 613) % H, 2, 2); }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "rgba(243,207,118,.35)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(28, 28, W - 56, H - 56, 36); ctx.stroke();
+  }
+
+  // Encabezado
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const oro = ctx.createLinearGradient(0, 90, 0, 250);
+  oro.addColorStop(0, "#fff3cf"); oro.addColorStop(.55, "#f3cf76"); oro.addColorStop(1, "#c9973a");
+  ctx.fillStyle = "#f3cf76";
+  ctx.font = "600 30px Cinzel, Georgia, serif";
+  ctx.fillText("✦  L O T E R Í A S   R D  ✦", W / 2, 118);
+  ctx.fillStyle = oro;
+  ctx.font = `700 ${d.metodo.length > 14 ? 76 : 92}px Cinzel, Georgia, serif`;
+  ctx.fillText(d.metodo.toUpperCase(), W / 2, 230);
+  ctx.fillStyle = "#d8d3e6";
+  ctx.font = "500 34px Inter, sans-serif";
+  const fecha = fechaLarga(d.fecha);
+  ctx.fillText(fecha.charAt(0).toUpperCase() + fecha.slice(1), W / 2, 288);
+  ctx.strokeStyle = "rgba(243,207,118,.4)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W / 2 - 160, 322); ctx.lineTo(W / 2 + 160, 322); ctx.stroke();
+
+  // Filas de números
+  const arriba = 360, abajo = H - (d.nota ? 170 : 130);
+  if (!d.filas.length) {
+    ctx.fillStyle = "#a7a3b8"; ctx.font = "500 38px Inter, sans-serif";
+    ctx.fillText("Todavía no hay números para este día", W / 2, (arriba + abajo) / 2);
+  } else if (d.filas.length > 3) {
+    // Muchas loterías: el nombre a la izquierda y las bolas a la derecha, una lotería por línea
+    const etiquetaW = 300, areaW = W - 2 * M - etiquetaW - 20;
+    const maxNums = Math.max(...d.filas.map((f) => f.numeros.length));
+    let s = 96;
+    while (s > 40 && (d.filas.length * (s * 1.22) > abajo - arriba || maxNums * s + (maxNums - 1) * s * .16 > areaW)) s -= 2;
+    const gap = s * .16, alto = s * 1.22;
+    let y = arriba + Math.max(0, (abajo - arriba - d.filas.length * alto) / 2);
+    d.filas.forEach((fila, i) => {
+      if (i % 2 === 0) { ctx.fillStyle = "rgba(255,255,255,.04)"; ctx.beginPath(); ctx.roundRect(M - 16, y - s * .11, W - 2 * M + 32, alto, 16); ctx.fill(); }
+      ctx.fillStyle = "#f3cf76"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      let tam = Math.round(Math.min(34, s * .42));
+      ctx.font = `600 ${tam}px Inter, sans-serif`;
+      while (tam > 16 && ctx.measureText(fila.titulo).width > etiquetaW) { tam -= 1; ctx.font = `600 ${tam}px Inter, sans-serif`; }
+      ctx.fillText(fila.titulo, M, y + s / 2);
+      let x = M + etiquetaW + 20;
+      for (const n of fila.numeros) { bolaCanvas(ctx, x, y, s, n, fila.fuego.includes(n)); x += s + gap; }
+      y += alto;
+    });
+  } else {
+    const m = medirFilas(d.filas, W - 2 * M, abajo - arriba);
+    let y = arriba + Math.max(0, (abajo - arriba - m.total) / 2);
+    for (const fila of d.filas) {
+      ctx.fillStyle = "#f3cf76";
+      ctx.font = `600 ${m.etiqueta}px Inter, sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      if (d.filas.length > 1 || fila.titulo !== "Jugada") ctx.fillText(fila.titulo.toUpperCase(), W / 2, y + m.etiqueta);
+      y += m.etiqueta + 10;
+      for (let i = 0; i < fila.numeros.length; i += m.porLinea) {
+        const linea = fila.numeros.slice(i, i + m.porLinea);
+        const anchoLinea = linea.length * m.s + (linea.length - 1) * m.gap;
+        let x = (W - anchoLinea) / 2;
+        for (const n of linea) { bolaCanvas(ctx, x, y, m.s, n, fila.fuego.includes(n)); x += m.s + m.gap; }
+        y += m.s + m.gap;
+      }
+      y += m.s * .18;
+    }
+  }
+
+  // Pie
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  if (d.nota) {
+    ctx.fillStyle = "#e9e4f5"; ctx.font = "500 30px Inter, sans-serif";
+    ctx.fillText(d.nota.length > 60 ? d.nota.slice(0, 58) + "…" : d.nota, W / 2, H - 120);
+  }
+  ctx.fillStyle = "#8f8aa3"; ctx.font = "400 24px Inter, sans-serif";
+  ctx.fillText("Juega con responsabilidad · ningún método garantiza premios", W / 2, H - 70);
+  return lienzo;
+}
+
+// Los flyers del Público y VIP: dónde están los círculos de los números y la caja de la fecha
+// (medidos sobre las imágenes originales: centro x, centro y, radio x, radio y)
+const FLYERS = {
+  gratis: {
+    titulo: "Grupo Gratis (Público)", src: "/flyer_gratis.jpg",
+    circulos: [[135, 502, 82, 67], [134, 687, 83, 66], [133, 861, 84, 64]],  // el 4º se quitó del flyer
+    grande: [1054, 649, 123, 118],
+    fecha: { x: 556, y: 928, w: 616, h: 76, largo: true },
+  },
+  vip: {
+    titulo: "Grupo VIP", src: "/flyer_vip.jpg",
+    circulos: [[133, 519, 86, 72], [136, 705, 89, 66]],  // el 3º se quitó del flyer
+    grande: [1077, 673, 136, 130],  // donde decía "ESTOY"
+    fecha: { x: 636, y: 878, w: 580, h: 90, largo: false },
+  },
+};
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+function fechaFlyer(iso, largo) {
+  const f = aFecha(iso), dia = f.getDate(), mes = MESES[f.getMonth()];
+  return largo ? `${DIAS[f.getDay()]} ${dia} ${mes.charAt(0).toUpperCase()}${mes.slice(1)}`
+    : `${String(dia).padStart(2, "0")} de ${mes}`;
+}
+
+// Tapa el número viejo de un círculo blanco: desde el centro pinta todo lo que sea blanco, gris o
+// negro (el número y su borde suave) hasta tocar el aro de color, imitando el sombreado del círculo
+function taparNumero(ctx, cx, cy, rx, ry) {
+  const x0 = Math.round(cx - rx - 8), y0 = Math.round(cy - ry - 8), w = Math.round(2 * rx + 16), h = Math.round(2 * ry + 16);
+  let datos;
+  try { datos = ctx.getImageData(x0, y0, w, h); } catch { return taparCirculo(ctx, cx, cy, rx, ry); }
+  const px = datos.data, marca = new Uint8Array(w * h);
+  const neutro = (i) => { const r = px[i], g = px[i + 1], b = px[i + 2]; return Math.max(r, g, b) - Math.min(r, g, b) < 46; };
+  const claro = (i) => neutro(i) && px[i] > 200;
+  // empieza en un punto blanco cerca del centro (el centro puede caer sobre una letra de color)
+  let semilla = -1;
+  for (let rad = 0; rad < Math.min(rx, ry) * .8 && semilla < 0; rad += 2) {
+    for (let a = 0; a < Math.PI * 2 && semilla < 0; a += .2) {
+      const x = Math.round(cx - x0 + rad * Math.cos(a)), y = Math.round(cy - y0 + rad * Math.sin(a));
+      if (claro((y * w + x) * 4)) semilla = y * w + x;
+    }
+  }
+  if (semilla < 0) return taparCirculo(ctx, cx, cy, rx, ry);
+  const pila = [semilla];
+  marca[semilla] = 1;
+  while (pila.length) {
+    const k = pila.pop(), x = k % w, y = (k - x) / w;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const j = ny * w + nx;
+      if (!marca[j] && neutro(j * 4)) { marca[j] = 1; pila.push(j); }
+    }
+  }
+  // el círculo es redondo: en cada fila se pinta de borde a borde, así se borran también las letras
+  // de color que quedaron dentro (como "ESTOY" o un número rojo)
+  for (let y = 0; y < h; y++) {
+    let izq = -1, der = -1;
+    for (let x = 0; x < w; x++) if (marca[y * w + x]) { if (izq < 0) izq = x; der = x; }
+    for (let x = izq; x >= 0 && x <= der; x++) marca[y * w + x] = 1;
+  }
+  // un píxel más hacia afuera, para borrar el borde suave de los números viejos
+  const final = marca.slice();
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const k = y * w + x;
+    if (!marca[k] && (marca[k - 1] || marca[k + 1] || marca[k - w] || marca[k + w])) final[k] = 2;
+  }
+  for (let k = 0; k < w * h; k++) {
+    if (!final[k]) continue;
+    const x = k % w, y = (k - x) / w;
+    const d = Math.min(1, Math.hypot((x + x0 - cx) / rx, (y + y0 - cy + ry * .25) / ry));
+    const v = 255 - 14 * d * d, i = k * 4;  // blanco al centro, un poco gris-azulado hacia el aro
+    const mezcla = final[k] === 2 ? .5 : 1;  // el borde se mezcla con lo que había
+    px[i] = px[i] * (1 - mezcla) + (v - 3) * mezcla;
+    px[i + 1] = px[i + 1] * (1 - mezcla) + (v - 2) * mezcla;
+    px[i + 2] = px[i + 2] * (1 - mezcla) + (v + 2 > 255 ? 255 : v + 2) * mezcla;
+  }
+  ctx.putImageData(datos, x0, y0);
+}
+
+// Tapa lo que había dentro de un círculo blanco, imitando su sombreado
+function taparCirculo(ctx, cx, cy, rx, ry) {
+  ctx.save();
+  const g = ctx.createRadialGradient(cx, cy - ry * .25, 0, cx, cy, Math.max(rx, ry));
+  g.addColorStop(0, "#ffffff"); g.addColorStop(.7, "#fbfbfd"); g.addColorStop(1, "#eceff8");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx - 3, ry - 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// Escribe un texto lo más grande posible dentro de un ancho y un alto
+function textoAjustado(ctx, texto, cx, cy, ancho, alto, familia, color, peso = "") {
+  let tam = Math.round(alto);
+  const fuente = () => `${peso ? peso + " " : ""}${tam}px ${familia}`;
+  ctx.font = fuente();
+  while (tam > 10 && ctx.measureText(texto).width > ancho) { tam -= 2; ctx.font = fuente(); }
+  ctx.fillStyle = color; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  // centra según la altura real de los números/letras, no la de la fuente
+  const m = ctx.measureText(texto);
+  ctx.fillText(texto, cx, cy + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2);
+}
+
+async function dibujarFlyer(tipo, numeros, iso) {
+  const cfg = FLYERS[tipo];
+  const img = await cargarImagen(cfg.src);
+  // espera las letras gruesas de los flyers (si no hay internet, usa las del sistema)
+  try {
+    await document.fonts.ready;
+    await Promise.race([Promise.all([document.fonts.load('140px "Archivo Black"', "0123456789"),
+      document.fonts.load('800 80px "Barlow Condensed"', "Lunes de noviembre")]), new Promise((ok) => setTimeout(ok, 4000))]);
+  } catch { /* sin fuentes */ }
+  const lienzo = document.createElement("canvas");
+  lienzo.width = img.width; lienzo.height = img.height;
+  const ctx = lienzo.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  const NUM = '"Archivo Black", "Arial Black", Impact, sans-serif';
+
+  // En la columna van los primeros; el último va solo en el círculo grande
+  // (Grupo Gratis: 3 + 1 · Grupo VIP: 2 + 1)
+  cfg.circulos.forEach(([cx, cy, rx, ry], i) => {
+    taparNumero(ctx, cx, cy, rx, ry);
+    if (numeros[i]) textoAjustado(ctx, numeros[i], cx, cy, rx * 1.72, ry * 1.6, NUM, "#0a0a0a");
+  });
+  const estrella = numeros[cfg.circulos.length];  // el que sigue a la columna va solo en el círculo grande
+  if (cfg.grande && estrella) {
+    const [cx, cy, rx, ry] = cfg.grande;
+    taparNumero(ctx, cx, cy, rx, ry);
+    ctx.save();
+    ctx.shadowColor = "rgba(120, 0, 0, .35)"; ctx.shadowOffsetY = 4; ctx.shadowBlur = 6;
+    textoAjustado(ctx, estrella, cx, cy, rx * 1.6, ry * 1.4, NUM, "#f0221b");
+    ctx.restore();
+  }
+  // Fecha: se tapa la caja blanca y se escribe la del día
+  const f = cfg.fecha;
+  ctx.save();
+  const g = ctx.createLinearGradient(0, f.y, 0, f.y + f.h);
+  g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#f2f4fb");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.roundRect(f.x, f.y, f.w, f.h, f.h * .45); ctx.fill();
+  ctx.restore();
+  textoAjustado(ctx, fechaFlyer(iso, f.largo), f.x + f.w / 2, f.y + f.h / 2, f.w * .94, f.h * .95,
+    '"Barlow Condensed", "Arial Narrow", sans-serif', "#0b1f73", "800");
+  return lienzo;
+}
+
+// Flyer de BINGO para los aciertos del Público: número grande, lotería y fecha ("GRATIS" queda igual)
+async function dibujarBingo(numero, loteria, iso) {
+  const img = await cargarImagen("/flyer_bingo.jpg");
+  try {
+    await document.fonts.ready;
+    await Promise.race([document.fonts.load('140px "Archivo Black"', "0123456789"), new Promise((ok) => setTimeout(ok, 4000))]);
+  } catch { /* sin fuentes */ }
+  const lienzo = document.createElement("canvas");
+  lienzo.width = img.width; lienzo.height = img.height;
+  const ctx = lienzo.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  // el número: se borra el viejo dentro del aro azul y se escribe el nuevo
+  taparNumero(ctx, 644, 652, 214, 192);
+  textoAjustado(ctx, numero, 644, 652, 360, 250, '"Archivo Black", "Arial Black", Impact, sans-serif', "#0a0a0a");
+  // las cajas de texto: se pintan de blanco por dentro y se escribe encima
+  const caja = (x, y, w, h, texto, fuente, color, peso, tam) => {
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fill();
+    textoAjustado(ctx, texto, x + w / 2, y + h / 2, w * .9, h * tam, fuente, color, peso);
+  };
+  caja(232, 880, 824, 52, loteria, "Inter, Arial, sans-serif", "#2f8a1c", "700", 1.05);
+  const f = fechaLarga(iso);
+  caja(352, 1083, 584, 40, f.toUpperCase(), "Inter, Arial, sans-serif", "#1c1c1c", "700", .78);
+  return lienzo;
+}
+
+async function abrirCompartir(vista, fecha) {
+  const caja = document.createElement("div");
+  caja.className = "wa-modal";
+  caja.innerHTML = `<div class="wa-caja"><button class="wa-cerrar" title="Cerrar">✕</button>
+    <h3>📲 Imagen para WhatsApp</h3><div class="wa-lista"><div class="vacio">Creando la imagen…</div></div>
+    <div class="wa-botones wa-todas"></div><p class="nota wa-ayuda"></p></div>`;
+  document.body.appendChild(caja);
+  const cerrar = () => caja.remove();
+  caja.onclick = (e) => { if (e.target === caja) cerrar(); };
+  caja.querySelector(".wa-cerrar").onclick = cerrar;
+  try {
+    const d = await api(`/api/compartir?metodo=${encodeURIComponent(vista)}${fecha ? `&fecha=${encodeURIComponent(fecha)}` : ""}`);
+    // Público y VIP usa los flyers; los demás métodos, el diseño de la página
+    const piezas = d.flyer
+      ? [{ titulo: FLYERS.gratis.titulo, lienzo: await dibujarFlyer("gratis", d.flyer.gratis, d.fecha), nombre: `grupo-gratis-${d.fecha}` },
+         { titulo: FLYERS.vip.titulo, lienzo: await dibujarFlyer("vip", d.flyer.vip, d.fecha), nombre: `grupo-vip-${d.fecha}` }]
+      : [{ titulo: d.metodo, lienzo: await dibujarImagen(d), nombre: `loterias-rd-${vista}-${d.fecha}` }];
+    // Un flyer por cada acierto del Público ese día
+    const PREMIO = ["", "1ra", "2da", "3ra"];
+    for (const a of (d.flyer && d.flyer.aciertos) || []) {
+      piezas.push({
+        titulo: `🎯 Acierto del Público: ${a.acierto} de ${PREMIO[a.premio]} en ${a.loteria}`,
+        lienzo: await dibujarBingo(a.acierto, a.loteria, d.fecha),
+        nombre: `acierto-${a.acierto}-${a.loteria.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${d.fecha}`,
+      });
+    }
+    const texto = `${d.metodo} · ${fechaLarga(d.fecha)}`;
+    const puedeCompartir = (files) => navigator.canShare && navigator.canShare({ files });
+    const puedeCopiar = window.ClipboardItem && navigator.clipboard && navigator.clipboard.write;
+    for (const p of piezas) {
+      p.blob = await new Promise((ok) => p.lienzo.toBlob(ok, "image/jpeg", .92));
+      p.archivo = new File([p.blob], `${p.nombre}.jpg`, { type: "image/jpeg" });
+      p.url = URL.createObjectURL(p.blob);
+    }
+    const lista = caja.querySelector(".wa-lista");
+    lista.innerHTML = "";
+    for (const p of piezas) {
+      const bloque = document.createElement("div");
+      bloque.className = "wa-pieza";
+      bloque.innerHTML = `${piezas.length > 1 ? `<h4>${esc(p.titulo)}</h4>` : ""}<div class="wa-vista"><img src="${p.url}" alt="${esc(p.titulo)}"></div>
+        <div class="wa-botones"></div>`;
+      const botones = bloque.querySelector(".wa-botones");
+      if (puedeCompartir([p.archivo])) {
+        const b = document.createElement("button");
+        b.className = "btn-wa"; b.textContent = "Compartir por WhatsApp";
+        b.onclick = () => navigator.share({ files: [p.archivo], text: texto }).catch(() => {});
+        botones.appendChild(b);
+      }
+      if (puedeCopiar) {
+        const b = document.createElement("button");
+        b.textContent = "Copiar imagen";
+        b.onclick = async () => {
+          try {
+            // el portapapeles solo acepta PNG
+            const png = await new Promise((ok) => p.lienzo.toBlob(ok, "image/png"));
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+            b.textContent = "✓ Copiada";
+          } catch { b.textContent = "No se pudo copiar"; }
+        };
+        botones.appendChild(b);
+      }
+      const desc = document.createElement("a");
+      desc.className = "wa-descargar"; desc.href = p.url; desc.download = `${p.nombre}.jpg`; desc.textContent = "Descargar";
+      botones.appendChild(desc);
+      lista.appendChild(bloque);
+    }
+    const todas = caja.querySelector(".wa-todas");
+    if (piezas.length > 1 && puedeCompartir(piezas.map((p) => p.archivo))) {
+      const b = document.createElement("button");
+      b.className = "btn-wa"; b.textContent = piezas.length === 2 ? "Compartir las dos juntas" : `Compartir las ${piezas.length} juntas`;
+      b.onclick = () => navigator.share({ files: piezas.map((p) => p.archivo), text: texto }).catch(() => {});
+      todas.appendChild(b);
+    }
+    if (d.flyer && !(d.flyer.aciertos || []).length) {
+      const nota = document.createElement("p");
+      nota.className = "nota wa-ayuda";
+      nota.textContent = "🎯 Todavía no hay aciertos del Público en 1ra este día. Cuando salga uno (y le des a «Actualizar»), aquí aparece su flyer.";
+      lista.appendChild(nota);
+    }
+    caja.querySelector(".wa-ayuda").textContent = puedeCompartir([piezas[0].archivo])
+      ? "Toca «Compartir por WhatsApp» y escoge el chat, el grupo o el estado."
+      : "En la computadora: «Copiar imagen» y pégala (Ctrl + V) en WhatsApp Web, o descárgala y adjúntala.";
+  } catch (e) {
+    caja.querySelector(".wa-lista").innerHTML = `<div class="aviso error">No se pudo crear la imagen: ${esc(e.message)}</div>`;
+  }
 }
 
 // ------------------------------------------------------------- Laboratorio

@@ -347,6 +347,29 @@ class TestVigilante(unittest.TestCase):
         self.assertGreater(web._z_bonferroni(11), 2.5)
 
 
+class TestCompartir(unittest.TestCase):
+    def test_numeros_para_la_imagen(self):
+        import sqlite3
+        from loterias import db, web
+        con = sqlite3.connect(":memory:")
+        con.execute("CREATE TABLE sorteos (loteria TEXT, grupo TEXT, fecha TEXT, numeros TEXT)")
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        db.guardar(con, [Sorteo("Lotería Nacional", "Nacional", d(i), ("10" if i < 9 else "29", "44", "15"))
+                         for i in range(1, 10)])
+        r = web.compartir(con, "vip", d(10))
+        self.assertEqual(r["metodo"], "Público y VIP")
+        self.assertEqual([f["titulo"] for f in r["filas"]][0], "Público")
+        self.assertIn("10", r["filas"][0]["numeros"])
+        self.assertIn("10", r["filas"][0]["fuego"])                       # el 29 de 1ra abre el 10
+        self.assertTrue(all(len(f["numeros"]) <= web.MAX_NUMEROS for f in r["filas"]))
+        self.assertIsNone(web.compartir(con, "no-existe", d(10)))
+        # aciertos: el día 9 la Nacional dio 29-44-15; el 10 es del Público -> no; se mira el día 9
+        r9 = web.compartir(con, "vip", d(9))
+        jugados = {n for f in r9["filas"][:1] for n in f["numeros"]}
+        esperados = ["29"] if "29" in jugados else []                   # solo cuenta la 1ra
+        self.assertEqual([a["acierto"] for a in r9["flyer"]["aciertos"]], esperados)
+
+
 class TestMaster(unittest.TestCase):
     def test_libro(self):
         from loterias.reglas import master
