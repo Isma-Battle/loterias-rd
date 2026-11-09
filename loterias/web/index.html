@@ -1955,7 +1955,7 @@ async function dibujarFlyer(tipo, numeros, iso) {
 }
 
 // Flyer de BINGO para los aciertos del Público: número grande, lotería y fecha ("GRATIS" queda igual)
-async function dibujarBingo(numero, loteria, iso) {
+async function dibujarBingo(numero, loteria, iso, grupo = "gratis") {
   const img = await cargarImagen("/flyer_bingo.jpg");
   try {
     await document.fonts.ready;
@@ -1967,7 +1967,9 @@ async function dibujarBingo(numero, loteria, iso) {
   ctx.drawImage(img, 0, 0);
   // el número: se borra el viejo dentro del aro azul y se escribe el nuevo
   taparNumero(ctx, 644, 652, 214, 192);
-  textoAjustado(ctx, numero, 644, 652, 360, 250, '"Archivo Black", "Arial Black", Impact, sans-serif', "#0a0a0a");
+  // un número grande, o los dos del palé ("06-29") más chicos para que quepan en el círculo
+  const pale = numero.includes("-");
+  textoAjustado(ctx, numero, 644, 652, pale ? 390 : 360, 250, '"Archivo Black", "Arial Black", Impact, sans-serif', "#0a0a0a");
   // las cajas de texto: se pintan de blanco por dentro y se escribe encima
   const caja = (x, y, w, h, texto, fuente, color, peso, tam) => {
     ctx.fillStyle = "#ffffff";
@@ -1975,6 +1977,27 @@ async function dibujarBingo(numero, loteria, iso) {
     textoAjustado(ctx, texto, x + w / 2, y + h / 2, w * .9, h * tam, fuente, color, peso);
   };
   caja(232, 880, 824, 52, loteria, "Inter, Arial, sans-serif", "#2f8a1c", "700", 1.05);
+  // VIP: se tapa "GRATIS" y se escribe "VIP" en el mismo fucsia
+  if (grupo === "vip") {
+    // borra solo las letras fucsia de "GRATIS" (el borde azul de la caja no se toca)
+    const [x0, y0, w, h] = [256, 968, 776, 82];
+    const datos = ctx.getImageData(x0, y0, w, h), px = datos.data;
+    // cada pixel fucsia toma el color de su misma fila un poco a la izquierda de las letras
+    // (blanco dentro de la caja, azul sobre el borde)
+    const ref = 470 - x0;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      // fucsia o su borde suave mezclado con blanco o azul (el azul del borde tiene r < g)
+      const fucsia = (r > 100 && b > 90 && g < r - 30 && g < b - 30) || (r > 45 && g < r - 12 && b > 120);
+      if (!fucsia) continue;
+      const fila = Math.floor(i / 4 / w), j = (fila * w + ref) * 4;
+      px[i] = px[j]; px[i + 1] = px[j + 1]; px[i + 2] = px[j + 2];
+    }
+    ctx.putImageData(datos, x0, y0);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.roundRect(268, 976, 752, 60, 30); ctx.fill();
+    textoAjustado(ctx, "VIP", 644, 1006, 600, 66, '"Archivo Black", "Arial Black", Impact, sans-serif', "#c803c2");
+  }
   const f = fechaLarga(iso);
   caja(352, 1083, 584, 40, f.toUpperCase(), "Inter, Arial, sans-serif", "#1c1c1c", "700", .78);
   return lienzo;
@@ -1997,13 +2020,16 @@ async function abrirCompartir(vista, fecha) {
       ? [{ titulo: FLYERS.gratis.titulo, lienzo: await dibujarFlyer("gratis", d.flyer.gratis, d.fecha), nombre: `grupo-gratis-${d.fecha}` },
          { titulo: FLYERS.vip.titulo, lienzo: await dibujarFlyer("vip", d.flyer.vip, d.fecha), nombre: `grupo-vip-${d.fecha}` }]
       : [{ titulo: d.metodo, lienzo: await dibujarImagen(d), nombre: `loterias-rd-${vista}-${d.fecha}` }];
-    // Un flyer por cada acierto del Público ese día
+    // Un flyer de BINGO por cada acierto en 1ra del Público (GRATIS) y del VIP ese día
     const PREMIO = ["", "1ra", "2da", "3ra"];
     for (const a of (d.flyer && d.flyer.aciertos) || []) {
+      const vip = a.grupo === "vip";
       piezas.push({
-        titulo: `🎯 Acierto del Público: ${a.acierto} de ${PREMIO[a.premio]} en ${a.loteria}`,
-        lienzo: await dibujarBingo(a.acierto, a.loteria, d.fecha),
-        nombre: `acierto-${a.acierto}-${a.loteria.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${d.fecha}`,
+        titulo: a.pale
+          ? `🎯 Palé ${vip ? "del VIP" : "del Público"}: ${a.acierto} (${a.premios.map((n) => PREMIO[n]).join(" y ")}) en ${a.loteria}`
+          : `🎯 Acierto ${vip ? "del VIP" : "del Público"}: ${a.acierto} de ${PREMIO[a.premio]} en ${a.loteria}`,
+        lienzo: await dibujarBingo(a.acierto, a.loteria, d.fecha, a.grupo),
+        nombre: `acierto-${vip ? "vip" : "gratis"}-${a.acierto}-${a.loteria.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${d.fecha}`,
       });
     }
     const texto = `${d.metodo} · ${fechaLarga(d.fecha)}`;
@@ -2056,7 +2082,7 @@ async function abrirCompartir(vista, fecha) {
     if (d.flyer && !(d.flyer.aciertos || []).length) {
       const nota = document.createElement("p");
       nota.className = "nota wa-ayuda";
-      nota.textContent = "🎯 Todavía no hay aciertos del Público en 1ra este día. Cuando salga uno (y le des a «Actualizar»), aquí aparece su flyer.";
+      nota.textContent = "🎯 Todavía no hay aciertos (Público ni VIP) este día. Cuando salga uno (y le des a «Actualizar»), aquí aparece su flyer.";
       lista.appendChild(nota);
     }
     caja.querySelector(".wa-ayuda").textContent = puedeCompartir([piezas[0].archivo])

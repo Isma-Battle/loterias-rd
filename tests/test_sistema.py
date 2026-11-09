@@ -365,9 +365,12 @@ class TestCompartir(unittest.TestCase):
         self.assertIsNone(web.compartir(con, "no-existe", d(10)))
         # aciertos: el día 9 la Nacional dio 29-44-15; el 10 es del Público -> no; se mira el día 9
         r9 = web.compartir(con, "vip", d(9))
-        jugados = {n for f in r9["filas"][:1] for n in f["numeros"]}
-        esperados = ["29"] if "29" in jugados else []                   # solo cuenta la 1ra
-        self.assertEqual([a["acierto"] for a in r9["flyer"]["aciertos"]], esperados)
+        for a in r9["flyer"]["aciertos"]:
+            fila = r9["filas"][0 if a["grupo"] == "gratis" else 1]["numeros"]
+            nums = a["acierto"].split("-")
+            self.assertTrue(all(n in fila for n in nums))                  # números de la jugada
+            self.assertTrue(all(n in ("29", "44", "15") for n in nums))     # que salieron ese día
+            self.assertEqual(a["pale"], len(nums) == 2)
 
 
 class TestMaster(unittest.TestCase):

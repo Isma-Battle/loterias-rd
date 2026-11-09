@@ -1046,11 +1046,19 @@ def compartir(con, metodo: str, fecha: date) -> dict | None:
         nota = "🔥 también los abre el Libro oculto" if fuego else ""
         # para los flyers: la bola grande de cada pareja (Grupo Gratis = Público, Grupo VIP = VIP)
         flyer = {"gratis": [x["numero"] for x in r["publico"]], "vip": [x["numero"] for x in r["vip"]]}
-        # aciertos del Público ese día: solo cuando uno de sus números (o su inverso) salió de 1ra
-        jugados = {n for x in r["publico"] for n in par(x)}
-        flyer["aciertos"] = [{"loteria": res["nombre"], "numeros": res["numeros"], "acierto": res["numeros"][0],
-                              "premio": 1}
-                             for res in r["resultados"] if res["numeros"] and res["numeros"][0] in jugados]
+        # aciertos del día, del Público (GRATIS) y del VIP: un número de la jugada (o su inverso) en 1ra,
+        # 2da o 3ra; si en la misma lotería salen dos o más, es un palé (un solo flyer con los dos)
+        flyer["aciertos"] = []
+        for grupo, lista in (("gratis", r["publico"]), ("vip", r["vip"])):
+            jugados = {n for x in lista for n in par(x)}
+            for res in r["resultados"]:
+                salen = [n for n in dict.fromkeys(res["numeros"]) if n in jugados]
+                if not salen:
+                    continue
+                premios = [res["numeros"].index(n) + 1 for n in salen[:2]]
+                flyer["aciertos"].append({"loteria": res["nombre"], "numeros": res["numeros"], "grupo": grupo,
+                                          "acierto": "-".join(salen[:2]), "pale": len(salen) > 1,
+                                          "premio": premios[0], "premios": premios})
     elif metodo == "laboratorio":
         r = laboratorio(con, fecha)
         if not r:
