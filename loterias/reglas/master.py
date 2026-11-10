@@ -5,7 +5,8 @@ de uno solo: se le suma 5 a la primera cifra, a la segunda o a las dos
 (10 -> 10, 15, 60, 65). Por eso aquí se guarda solo el primero de cada fila.
 
 Seguimiento: el 1er premio de la Nacional Noche señala su fila, y esos 4 números
-(ningún otro) se siguen al día siguiente en Gana Más, Real Día, Loteka Noche y Leidsa.
+(ningún otro) se siguen al día siguiente en Gana Más, Real Día, Loteka Noche, Leidsa,
+New York (Tarde y Noche) y La Primera (Día y Noche).
 
     Ejemplo (capítulo 12): Nacional Noche sale 01  ->  seguir 10, 15, 60 y 65
 """
@@ -26,6 +27,10 @@ DESTINOS = [
     ("Real Día", "Quiniela Real"),
     ("Loteka Noche", "Quiniela Loteka Noche"),
     ("Leidsa", "Quiniela Leidsa"),
+    ("NY Tarde", "New York Tarde"),
+    ("NY Noche", "New York Noche"),
+    ("Primera Día", "La Primera Día"),
+    ("Primera Noche", "Primera Noche"),
 ]
 NOMBRES = [n for _, n in DESTINOS]
 PROB_AZAR = 1 - 0.99 ** 3

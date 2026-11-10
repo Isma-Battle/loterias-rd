@@ -14,7 +14,7 @@ y pide los datos a estas rutas (todas devuelven JSON):
     GET  /api/fuertes?fecha=...          las 7 parejas número-inverso que más han salido en 3 años en cada indicada,
                                          más Real Noche, Loteka, King Lottery y Florida (Día y Noche)
     GET  /api/master?fecha=...           la fila del libro Master KA para el 1er premio de la Nacional Noche,
-                                         seguida en Gana Más, Real Día, Loteka Noche y Leidsa
+                                         seguida en Gana Más, Real Día, Loteka Noche, Leidsa, New York y La Primera
     GET  /api/king?fecha=...             Master King: el último sorteo de cada lotería abre sus filas de los
                                          capítulos 05 y 07 del Máster Ka; se juegan los 4 que más han salido
     GET  /api/raya?fecha=...             3 en raya: los campos del capítulo 05 del Máster Ka que abre el último

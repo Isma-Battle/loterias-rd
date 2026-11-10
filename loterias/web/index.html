@@ -2028,7 +2028,8 @@ async function abrirCompartir(vista, fecha) {
         titulo: a.pale
           ? `🎯 Palé ${vip ? "del VIP" : "del Público"}: ${a.acierto} (${a.premios.map((n) => PREMIO[n]).join(" y ")}) en ${a.loteria}`
           : `🎯 Acierto ${vip ? "del VIP" : "del Público"}: ${a.acierto} de ${PREMIO[a.premio]} en ${a.loteria}`,
-        lienzo: await dibujarBingo(a.acierto, a.loteria, d.fecha, a.grupo),
+        // la caja verde dice la lotería y en qué posición salió: "Gana Más · 1ra" / "Primera Noche · 2da y 3ra"
+        lienzo: await dibujarBingo(a.acierto, `${a.loteria} · ${(a.premios || [a.premio]).map((n) => PREMIO[n]).join(" y ")}`, d.fecha, a.grupo),
         nombre: `acierto-${vip ? "vip" : "gratis"}-${a.acierto}-${a.loteria.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${d.fecha}`,
       });
     }
@@ -2365,7 +2366,7 @@ async function vistaMaster(fecha) {
       <div>
         <div class="eyebrow">✦ Libro Master KA · Capítulo 12</div>
         <h2>Master</h2>
-        <div class="sub">${esc(fechaLarga(d.fecha))} · el 1er premio de la Nacional Noche y su fila, seguida en Gana Más, Real Día, Loteka Noche y Leidsa</div>
+        <div class="sub">${esc(fechaLarga(d.fecha))} · el 1er premio de la Nacional Noche y su fila, seguida en ${esc(d.loterias.map((l) => l.etiqueta).join(", "))}</div>
         <div class="nav-fecha">
           <button id="ant" ${d.anterior ? "" : "disabled"} title="Día anterior">‹ Anterior</button>
           <input type="date" id="fecha" value="${esc(d.fecha)}">
