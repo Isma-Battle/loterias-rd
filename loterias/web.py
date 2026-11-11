@@ -23,7 +23,7 @@ y pide los datos a estas rutas (todas devuelven JSON):
                                          secuencia; se juegan los 6 más respaldados con su V
     GET  /api/vip?fecha=...              Público y VIP: las 7 parejas más fuertes en 1er premio de 10 loterías
                                          juntas; las 4 primeras son del Público y las otras 3 del VIP. Los
-                                         que además abre el Libro oculto (1ros premios de 3 días) llevan fuego
+                                         que además abre el Libro oculto (1ros premios de 2 días) llevan fuego
     GET  /api/formula?fecha=...          La Fórmula: 6 números de la Anguila de las 10 AM (1·23·2 -> 12 32) y en
                                          qué loterías de ese día han salido más de 1er premio
     GET  /api/laboratorio?fecha=...      Laboratorio: los números en que más métodos coinciden, El Vigilante

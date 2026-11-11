@@ -292,8 +292,8 @@ class TestLibroOculto(unittest.TestCase):
         from loterias import db, web
         from loterias.reglas import oculto
         d = lambda i: date(2026, 1, i)  # noqa: E731
-        prim = oculto.primeras_de([Sorteo("Florida Día", "Americanas", d(7), ("29", "00", "00")),   # 3 días atrás
-                                   Sorteo("Florida Día", "Americanas", d(6), ("37", "00", "00"))],  # 4: no cuenta
+        prim = oculto.primeras_de([Sorteo("Florida Día", "Americanas", d(8), ("29", "00", "00")),   # 2 días atrás
+                                   Sorteo("Florida Día", "Americanas", d(7), ("37", "00", "00"))],  # 3: no cuenta
                                   d(10))
         nums, abiertas = oculto.abiertos(prim)
         self.assertEqual([a["secuencia"] for a in abiertas], ["29-10", "29v-39-36", "92v-10v-39v"])  # 92v también es el 29

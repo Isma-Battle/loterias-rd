@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-DIAS_ATRAS = 3
+DIAS_ATRAS = 2  # 1ros premios de ayer y anteayer
 
 # Copiadas del libro en el mismo orden. "24 voltea 42" y "62 voltea 26" van como 24-42 y 62-26;
 # "29v--39 se ligan en tripleta 29 39 36" va como 29v-39-36; "83v--->28 FULL" como 83v-28.
