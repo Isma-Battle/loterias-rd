@@ -159,11 +159,13 @@ class TestPublicoVip(unittest.TestCase):
         datos = [Sorteo("Gana Más", "Nacional", d(i), ("12", "77", f"{i + 50:02d}")) for i in range(1, 11)]
         datos += [Sorteo("Quiniela Real", "Loteria Real", d(i), ("34" if i <= 5 else "89", "77", f"{i + 60:02d}"))
                   for i in range(1, 11)]
-        datos += [Sorteo("Quiniela Leidsa", "Leidsa", d(i), ("99", "99", "99")) for i in range(1, 11)]
+        datos += [Sorteo("Quiniela LoteDom", "LoteDom", d(i), ("99", "99", "99")) for i in range(1, 11)]
         datos.append(Sorteo("Gana Más", "Nacional", d(11), ("12", "00", "01")))
         db.guardar(con, datos)
         r = web.publico_vip(con, d(11))
-        self.assertEqual(r["sorteos"], 20)  # Leidsa no está en este método
+        self.assertEqual(r["sorteos"], 20)  # LoteDom no está en este método
+        self.assertIn("Quiniela Leidsa", web.NOMBRES_VIP)       # Leidsa sí
+        self.assertNotIn("Quiniela Leidsa", web.NOMBRES_FORMULA)  # La Fórmula sigue sin Leidsa
         self.assertEqual([(x["numero"], x["inverso"], x["primero"]) for x in r["publico"]],
                          [("12", "21", 10), ("89", "98", 5), ("34", "43", 5)])
         self.assertEqual(r["vip"], [])  # solo 3 parejas han salido de 1ra
@@ -371,6 +373,37 @@ class TestCompartir(unittest.TestCase):
             self.assertTrue(all(n in fila for n in nums))                  # números de la jugada
             self.assertTrue(all(n in ("29", "44", "15") for n in nums))     # que salieron ese día
             self.assertEqual(a["pale"], len(nums) == 2)
+
+
+class TestSelecciones(unittest.TestCase):
+    def test_agregar_y_quitar(self):
+        import tempfile
+        from loterias import web
+        antes = list(web.NOMBRES_VIP)
+        try:
+            web.aplicar_seleccion("vip", ["Gana Más", "Anguila 10:00 AM", "Gana Más"])
+            self.assertEqual(web.NOMBRES_VIP, ["Gana Más", "Anguila 10:00 AM"])
+            self.assertEqual(web.LOTERIAS_VIP[1], ("Anguila 10:00 AM", "Anguila 10:00 AM"))
+            self.assertIn("Florida Día", web.NOMBRES_OCULTO)          # el Libro oculto sigue con Florida
+            ruta = Path(tempfile.mkdtemp()) / "sel.json"
+            web.guardar_selecciones(ruta)
+            web.aplicar_seleccion("vip", None)
+            self.assertEqual(web.NOMBRES_VIP, antes)
+            web.cargar_selecciones(ruta)                               # lo guardado vuelve
+            self.assertEqual(web.NOMBRES_VIP, ["Gana Más", "Anguila 10:00 AM"])
+            web.aplicar_seleccion("oraculo", ["Gana Más"])
+            self.assertEqual(web.seleccion("oraculo"), ["Gana Más"])
+        finally:
+            web.aplicar_seleccion("vip", None)
+            web.aplicar_seleccion("oraculo", None)
+        self.assertEqual(web.NOMBRES_VIP, antes)
+
+    def test_josefina_con_loteria_nueva(self):
+        from loterias.reglas import josefina
+        d = lambda i: date(2026, 1, i)  # noqa: E731
+        datos = {("Anguila 10:00 AM", d(9)): Sorteo("Anguila 10:00 AM", "Anguila", d(9), ("30", "11", "22"))}
+        j = josefina.jugar("Anguila 10:00 AM", d(10), lambda l, f: datos.get((l, f)))
+        self.assertTrue({"15", "70"} <= {x["numero"] for x in j["jugada"]})  # el 30 jala 85 15 70
 
 
 class TestMaster(unittest.TestCase):

@@ -21,7 +21,7 @@ y pide los datos a estas rutas (todas devuelven JSON):
                                          sorteo, en las mismas loterías que los 7 más fuertes
     GET  /api/josefina?fecha=...         Guía Josefina: lo que salió ayer en las loterías indicadas jala su
                                          secuencia; se juegan los 6 más respaldados con su V
-    GET  /api/vip?fecha=...              Público y VIP: las 7 parejas más fuertes en 1er premio de 10 loterías
+    GET  /api/vip?fecha=...              Público y VIP: las 7 parejas más fuertes en 1er premio de 11 loterías
                                          juntas; las 4 primeras son del Público y las otras 3 del VIP. Los
                                          que además abre el Libro oculto (1ros premios de 2 días) llevan fuego
     GET  /api/formula?fecha=...          La Fórmula: 6 números de la Anguila de las 10 AM (1·23·2 -> 12 32) y en
@@ -31,6 +31,8 @@ y pide los datos a estas rutas (todas devuelven JSON):
     GET  /api/compartir?metodo=...&fecha=...  los números de un método en filas, para la imagen de WhatsApp
     GET  /flyer_gratis.jpg, /flyer_vip.jpg   los flyers del Público y VIP (se les cambian números y fecha)
     GET  /plantilla.png                  la imagen modelo para compartir (loterias/web/plantilla.png), si existe
+    GET  /api/selecciones?metodo=...     las loterías que se pueden escoger para un método y las elegidas
+    POST /api/selecciones                {"metodo": ..., "loterias": [...]} o {"metodo": ..., "restablecer": true}
     POST /api/actualizar                 descarga los resultados de hoy y ayer
 """
 
@@ -176,7 +178,9 @@ def recomendaciones(con, fecha: date, solo: str | None = None) -> dict | None:
 
     señales: dict[str, dict[str, list[str]]] = defaultdict(dict)  # lotería -> regla -> números
     for p in motor.predecir(todos, REGLAS, fecha):
-        if (solo and p.loteria != solo) or (fecha - ultimos[p.loteria].fecha).days > DIAS_INACTIVA:
+        elegidas = _LIBRES["oraculo"]
+        if (solo and p.loteria != solo) or (fecha - ultimos[p.loteria].fecha).days > DIAS_INACTIVA \
+                or (elegidas is not None and p.loteria not in elegidas):
             continue
         señales[p.loteria][p.regla] = p.numeros
 
@@ -525,7 +529,7 @@ def fuertes(con, fecha: date) -> dict | None:
 def master_king(con, fecha: date) -> dict | None:
     """Capítulos 05 y 07: los números del último sorteo de cada lotería abren sus filas y
     se juegan los libro_king.CUANTOS de esas filas que más han salido en esa lotería."""
-    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_FUERTES]
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_KING]
     if not todos:
         return None
     hoy = datetime.now(recolector.ZONA_RD).date()
@@ -534,7 +538,7 @@ def master_king(con, fecha: date) -> dict | None:
         x["numero"] for x in libro_king.jugar(v[-1].numeros, veces, ultima)})
 
     tarjetas = []
-    for etiqueta, nombre in LOTERIAS_FUERTES:
+    for etiqueta, nombre in LOTERIAS_KING:
         v = [x for x in r.ventana.get(nombre, []) if x.fecha >= desde]
         if not v:
             continue
@@ -669,7 +673,7 @@ NOMBRES_JOSEFINA = [n for nombres in libro_josefina.FAMILIAS.values() for n in n
 def josefina(con, fecha: date) -> dict | None:
     """Guía Josefina: en cada lotería, lo que salió ayer (y anteayer) en sus loterías indicadas
     abre sus secuencias, y se juegan los libro_josefina.CUANTOS números más respaldados con su V."""
-    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_JOSEFINA]
+    todos = [s for s in db.cargar(con, hasta=fecha) if s.loteria in NOMBRES_JOSEFINA or s.loteria in _FUENTES_JOSEFINA]
     if not todos:
         return None
     hoy = datetime.now(recolector.ZONA_RD).date()
@@ -678,32 +682,32 @@ def josefina(con, fecha: date) -> dict | None:
     ultimo = {s.loteria: s.fecha for s in todos if s.fecha < fecha}
 
     tarjetas = []
-    for familia, nombres in libro_josefina.FAMILIAS.items():
-        for nombre in nombres:
-            if nombre not in ultimo or (fecha - ultimo[nombre]).days > DIAS_INACTIVA:
-                continue
-            real = indice.get((nombre, fecha))
-            salidos = set(real.numeros) if real else None
-            j = libro_josefina.jugar(nombre, fecha, buscar)
-            tarjetas.append({
-                "nombre": nombre,
-                "familia": familia,
-                "fuerte": familia in libro_josefina.MAS_FUERTES,
-                "indicadas": [f for f, _ in libro_josefina.de_donde(familia)],
-                "numeros": [{**x, "acierto": _salio(salidos, [x["numero"]]),
-                             "acierto_v": _salio(salidos, [x["inverso"]]) if x["inverso"] else None}
-                            for x in j["jugada"]],
-                "abiertas": j["abiertas"],
-                "pales": j["pales"],
-                "resultado": list(real.numeros) if real else None,
-            })
+    for nombre in NOMBRES_JOSEFINA:
+        familia = libro_josefina.FAMILIA_DE.get(nombre, nombre)
+        if nombre not in ultimo or (fecha - ultimo[nombre]).days > DIAS_INACTIVA:
+            continue
+        real = indice.get((nombre, fecha))
+        salidos = set(real.numeros) if real else None
+        j = libro_josefina.jugar(nombre, fecha, buscar)
+        tarjetas.append({
+            "nombre": nombre,
+            "familia": familia,
+            "fuerte": familia in libro_josefina.MAS_FUERTES,
+            "indicadas": [f for f, _ in libro_josefina.de_donde(familia)],
+            "numeros": [{**x, "acierto": _salio(salidos, [x["numero"]]),
+                         "acierto_v": _salio(salidos, [x["inverso"]]) if x["inverso"] else None}
+                        for x in j["jugada"]],
+            "abiertas": j["abiertas"],
+            "pales": j["pales"],
+            "resultado": list(real.numeros) if real else None,
+        })
 
     # Cómo le fue: cada sorteo de los DIAS_PRUEBA días anteriores, con lo que había antes de ese día
     clave = (fecha, len(todos))
     if clave not in _cache_josefina:
         sorteos = jugados = aciertos = con_acierto = con_v = 0
         for s in todos:
-            if fecha - timedelta(days=DIAS_PRUEBA) <= s.fecha < fecha:
+            if fecha - timedelta(days=DIAS_PRUEBA) <= s.fecha < fecha and s.loteria in NOMBRES_JOSEFINA:
                 j = libro_josefina.jugar(s.loteria, s.fecha, buscar)["jugada"]
                 if not j:
                     continue
@@ -742,6 +746,7 @@ LOTERIAS_VIP = [
     ("Nueva York", "New York Tarde"), ("Nueva York", "New York Noche"),
     ("Suerte", "La Suerte 12:30"), ("Suerte", "La Suerte 18:00"),
     ("Real", "Quiniela Real"), ("Loteka", "Quiniela Loteka Noche"),
+    ("Leidsa", "Quiniela Leidsa"),
 ]
 NOMBRES_VIP = [n for _, n in LOTERIAS_VIP]
 CUANTOS_PUBLICO = 4  # los de más fuerza en 1ra; los otros 3 de los 7 son VIP
@@ -1125,8 +1130,10 @@ def laboratorio(con, fecha: date) -> dict | None:
     for s in todos:
         if s.fecha < fecha and len(s.numeros) == 3 and all(len(n) == 2 and n.isdigit() for n in s.numeros):
             por_lot[s.loteria].append(s)
+    elegidas = _LIBRES.get("laboratorio")
     activas = {l: ss for l, ss in por_lot.items()
-               if len(ss) >= libro_vigilante.MIN_SORTEOS and (fecha - ss[-1].fecha).days <= DIAS_INACTIVA}
+               if len(ss) >= libro_vigilante.MIN_SORTEOS and (fecha - ss[-1].fecha).days <= DIAS_INACTIVA
+               and (elegidas is None or l in elegidas)}
     vigilante = []
     for l, ss in activas.items():
         v = libro_vigilante.revisar(ss, len(activas))
@@ -1188,8 +1195,8 @@ def _z_bonferroni(pruebas: int, alfa: float = 0.05) -> float:
 
 # Los números salen de la Anguila de las 10 de la mañana y se juegan ese mismo día en estas
 ORIGEN_FORMULA = "Anguila 10:00 AM"
-LOTERIAS_FORMULA = LOTERIAS_VIP
-NOMBRES_FORMULA = NOMBRES_VIP
+LOTERIAS_FORMULA = [x for x in LOTERIAS_VIP if x[0] != "Leidsa"]  # La Fórmula sigue con sus 10
+NOMBRES_FORMULA = [n for _, n in LOTERIAS_FORMULA]
 DESTINOS_FORMULA = 3  # en cuántas loterías se recomienda jugarlos
 
 
@@ -1402,8 +1409,113 @@ def _actualizar_cada(ruta_db: Path, segundos: int):
 
 # --------------------------------------------------------------------- servidor
 
+# ---------------------------------------------------- loterías de cada método
+# Cada método juega en una lista de loterías que se puede cambiar desde la página. Las listas se
+# cambian "en su lugar" (lista[:] = ...), así todo lo que las usa ve el cambio. Lo elegido se guarda
+# en datos/selecciones.json; si un método no aparece ahí, usa su lista de siempre.
+
+RUTA_SELECCIONES = db.RUTA_DB.parent / "selecciones.json"
+LOTERIAS_KING = list(LOTERIAS_FUERTES)   # Master King tenía las mismas que Los 7 más fuertes
+NOMBRES_KING = [n for _, n in LOTERIAS_KING]
+LOTERIAS_JOSEFINA = [(n, n) for n in NOMBRES_JOSEFINA]
+_FUENTES_JOSEFINA = list(NOMBRES_JOSEFINA)  # de donde sale la secuencia (no se quitan)
+_FLORIDA_OCULTO = ["Florida Día", "Florida Noche"]
+
+# método -> (lista de pares (etiqueta, nombre), [listas de nombres que la siguen])
+_LISTAS = {
+    "indicadas": (libro.INDICADAS, [libro.NOMBRES]),
+    "fuertes": (LOTERIAS_FUERTES, [NOMBRES_FUERTES]),
+    "king": (LOTERIAS_KING, [NOMBRES_KING]),
+    "raya": (LOTERIAS_RAYA, [NOMBRES_RAYA]),
+    "master": (libro_master.DESTINOS, [libro_master.NOMBRES]),
+    "josefina": (LOTERIAS_JOSEFINA, [NOMBRES_JOSEFINA]),
+    "vip": (LOTERIAS_VIP, [NOMBRES_VIP]),
+    "formula": (LOTERIAS_FORMULA, [NOMBRES_FORMULA]),
+}
+# Estos miran todas las loterías; None = todas
+_LIBRES: dict[str, list[str] | None] = {"oraculo": None, "laboratorio": None}
+_POR_DEFECTO = {m: list(pares) for m, (pares, _) in _LISTAS.items()}
+_ETIQUETAS = {n: e for pares in _POR_DEFECTO.values() for e, n in pares}
+_seleccion_lock = threading.Lock()
+
+
+def seleccion(metodo: str) -> list[str] | None:
+    """Las loterías elegidas de un método (None = todas)."""
+    if metodo in _LIBRES:
+        return _LIBRES[metodo]
+    return [n for _, n in _LISTAS[metodo][0]]
+
+
+def _vaciar_caches():
+    for nombre, valor in list(globals().items()):
+        if nombre.startswith("_cache") and isinstance(valor, dict):
+            valor.clear()
+
+
+def aplicar_seleccion(metodo: str, nombres: list[str] | None):
+    """Cambia las loterías de un método (None = las de siempre)."""
+    if metodo in _LIBRES:
+        _LIBRES[metodo] = None if nombres is None else list(dict.fromkeys(nombres))
+    elif metodo in _LISTAS:
+        pares, seguidoras = _LISTAS[metodo]
+        if nombres is None:
+            nuevos = list(_POR_DEFECTO[metodo])
+        else:
+            elegidos = list(dict.fromkeys(nombres))
+            # las de siempre en su orden, y las nuevas al final
+            de_siempre = [(e, n) for e, n in _POR_DEFECTO[metodo] if n in elegidos]
+            nuevas = [(_ETIQUETAS.get(n, n), n) for n in elegidos if n not in {x for _, x in de_siempre}]
+            nuevos = de_siempre + nuevas
+        pares[:] = nuevos
+        for lista in seguidoras:
+            lista[:] = [n for _, n in nuevos]
+        if metodo == "vip":
+            NOMBRES_OCULTO[:] = NOMBRES_VIP + [n for n in _FLORIDA_OCULTO if n not in NOMBRES_VIP]
+    else:
+        raise ValueError(f"Método desconocido: {metodo}")
+    _vaciar_caches()
+
+
+def cargar_selecciones(ruta: Path = RUTA_SELECCIONES):
+    try:
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    for metodo, nombres in datos.items():
+        if metodo in _LISTAS or metodo in _LIBRES:
+            aplicar_seleccion(metodo, nombres)
+
+
+def guardar_selecciones(ruta: Path = RUTA_SELECCIONES):
+    datos = {m: [n for _, n in pares] for m, (pares, _) in _LISTAS.items() if pares != _POR_DEFECTO[m]}
+    datos.update({m: v for m, v in _LIBRES.items() if v is not None})
+    ruta.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def loterias_disponibles(con, metodo: str) -> dict:
+    """Las loterías que se pueden escoger para un método, agrupadas, y cuáles están elegidas."""
+    filas = con.execute("SELECT loteria, grupo, numeros, fecha FROM sorteos s WHERE fecha = "
+                        "(SELECT MAX(fecha) FROM sorteos WHERE loteria = s.loteria)").fetchall()
+    def quiniela(numeros):
+        p = numeros.split("-")
+        return len(p) == 3 and all(len(x) == 2 and x.isdigit() for x in p)
+    # El Oráculo juega en todas; los demás métodos, en quinielas (3 números de 2 cifras)
+    disponibles = [(l, g, f) for l, g, n, f in filas if metodo == "oraculo" or quiniela(n)]
+    elegidas = seleccion(metodo)
+    por_defecto = None if metodo in _LIBRES else [n for _, n in _POR_DEFECTO[metodo]]
+    todas = [l for l, _, _ in disponibles]
+    return {
+        "metodo": metodo,
+        "grupos": _agrupar((g, {"nombre": l, "ultimo": f}) for l, g, f in disponibles),
+        "elegidas": todas if elegidas is None else elegidas,
+        "por_defecto": todas if por_defecto is None else por_defecto,
+    }
+
+
 def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                    publico: bool = False) -> ThreadingHTTPServer:
+    cargar_selecciones()
+
     class Manejador(BaseHTTPRequestHandler):
         def log_message(self, *args):  # sin ruido en la terminal
             pass
@@ -1506,6 +1618,11 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     if datos is None:
                         return self._json({"error": "Todavía no hay datos"}, 404)
                     return self._json(datos)
+                if url.path == "/api/selecciones":
+                    metodo = q.get("metodo", "")
+                    if metodo not in _LISTAS and metodo not in _LIBRES:
+                        return self._json({"error": "Método desconocido"}, 404)
+                    return self._json({**loterias_disponibles(con, metodo), "editable": not publico})
                 if url.path == "/api/compartir":
                     try:
                         fecha = date.fromisoformat(q.get("fecha", ""))
@@ -1552,6 +1669,22 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                 con.close()
 
         def do_POST(self):
+            if urlparse(self.path).path == "/api/selecciones":
+                if publico:
+                    return self._json({"error": "En la nube no se pueden cambiar las loterías"}, 403)
+                try:
+                    largo = int(self.headers.get("Content-Length", 0))
+                    datos = json.loads(self.rfile.read(largo) or b"{}")
+                    metodo = datos["metodo"]
+                    nombres = None if datos.get("restablecer") else [str(n) for n in datos["loterias"]]
+                    if nombres is not None and not nombres:
+                        return self._json({"error": "Escoge al menos una lotería"}, 400)
+                    with _seleccion_lock:
+                        aplicar_seleccion(metodo, nombres)
+                        guardar_selecciones()
+                except (KeyError, ValueError, TypeError) as e:
+                    return self._json({"error": f"Datos no válidos: {e}"}, 400)
+                return self._json({"ok": True, "elegidas": seleccion(metodo)})
             if urlparse(self.path).path != "/api/actualizar":
                 return self._json({"error": "No encontrado"}, 404)
             if publico:  # en la nube se actualiza sola; nadie de fuera dispara descargas

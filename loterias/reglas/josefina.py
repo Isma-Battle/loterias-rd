@@ -86,8 +86,9 @@ PESO = (4, 3, 2, 1)  # puntos según el puesto en la indicación
 
 def de_donde(familia: str) -> list[tuple[str, int]]:
     """Las familias cuya secuencia sale en `familia`, con su puesto (0 = ella misma)."""
-    return sorted(((f, lista.index(familia)) for f, lista in INDICA.items() if familia in lista),
-                  key=lambda x: (x[1], x[0]))
+    r = sorted(((f, lista.index(familia)) for f, lista in INDICA.items() if familia in lista),
+               key=lambda x: (x[1], x[0]))
+    return r or [(familia, 0)]  # una lotería que no está en la guía: se mira solo a ella misma
 
 
 def inverso(n: str) -> str:
@@ -107,8 +108,8 @@ def jugar(destino: str, dia: date, buscar) -> dict:
     traen: dict[str, list[dict]] = {}
     mejor_dia: dict[str, int] = {}
     abiertas, pales = [], []
-    for familia, puesto in de_donde(FAMILIA_DE[destino]):
-        for loteria in FAMILIAS[familia]:
+    for familia, puesto in de_donde(FAMILIA_DE.get(destino, destino)):
+        for loteria in FAMILIAS.get(familia, [familia]):
             for atras in (1, 2):
                 s = buscar(loteria, dia - timedelta(days=atras))
                 if not s:

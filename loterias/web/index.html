@@ -551,6 +551,23 @@
   .wa-pieza { display: grid; gap: 10px; }
   .wa-pieza h4 { margin: 0; font: 600 13px var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--tenue); }
   .wa-todas:empty { display: none; }
+  .lot-caja { width: min(560px, 100%); }
+  .lot-nota { margin: 0; }
+  .lot-buscar { width: 100%; border-radius: 12px; }
+  .lot-atajos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .lot-atajos button { padding: 6px 12px; font-size: 13px; }
+  .lot-cuenta { margin-left: auto; font-size: 12.5px; color: var(--oro); }
+  .lot-lista { display: grid; gap: 12px; max-height: 50vh; overflow: auto; padding-right: 4px; }
+  .lot-grupo h4 { margin: 0 0 6px; font: 600 12px var(--display); letter-spacing: .16em; text-transform: uppercase; color: var(--oro); }
+  .lot-grupo h4 label { cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+  .lot-grupo { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 10px; }
+  .lot-grupo h4 { grid-column: 1 / -1; }
+  .lot-item { display: flex; gap: 8px; align-items: center; font-size: 13.5px; padding: 5px 8px; border-radius: 10px; cursor: pointer; }
+  .lot-item:hover { background: var(--panel-2); }
+  .lot-item.de-siempre span { color: var(--marfil); }
+  .lot-caja input[type=checkbox] { accent-color: var(--oro); width: 16px; height: 16px; flex-shrink: 0; }
+  .lot-msg { margin: 0; text-align: center; }
+  .lot-msg.error { color: var(--rubi); }
 
   footer { max-width: 1240px; margin: 0 auto; padding: 0 20px 40px; }
   footer p { font-size: 12.5px; color: var(--muy-tenue); text-align: center; line-height: 1.7; margin: 0; }
@@ -1673,6 +1690,93 @@ function botonCompartir(vista) {
   b.innerHTML = "📲 Imagen para WhatsApp";
   b.onclick = () => abrirCompartir(vista, $("#fecha") ? $("#fecha").value : "");
   barra.appendChild(b);
+  const l = document.createElement("button");
+  l.id = "elegir-loterias";
+  l.innerHTML = "🎰 Loterías";
+  l.title = "Escoger en qué loterías juega este método";
+  l.onclick = () => abrirLoterias(vista);
+  barra.appendChild(l);
+}
+
+// Ventana para agregar o quitar las loterías de un método
+async function abrirLoterias(vista) {
+  const caja = document.createElement("div");
+  caja.className = "wa-modal";
+  caja.innerHTML = `<div class="wa-caja lot-caja"><button class="wa-cerrar" title="Cerrar">✕</button>
+    <h3>🎰 Loterías de este método</h3><div class="lot-cuerpo"><div class="vacio">Cargando…</div></div></div>`;
+  document.body.appendChild(caja);
+  const cerrar = () => caja.remove();
+  caja.onclick = (e) => { if (e.target === caja) cerrar(); };
+  caja.querySelector(".wa-cerrar").onclick = cerrar;
+  const cuerpo = caja.querySelector(".lot-cuerpo");
+  let d;
+  try { d = await api(`/api/selecciones?metodo=${encodeURIComponent(vista)}`); }
+  catch (e) { cuerpo.innerHTML = `<div class="aviso error">${esc(e.message)}</div>`; return; }
+  const elegidas = new Set(d.elegidas), defecto = new Set(d.por_defecto);
+  // las que ya no tienen sorteos guardados pero estaban elegidas también se muestran
+  const conocidas = new Set(d.grupos.flatMap((g) => g.loterias.map((l) => l.nombre)));
+  const extra = d.elegidas.filter((n) => !conocidas.has(n));
+  const grupos = extra.length ? [...d.grupos, { grupo: "Sin datos recientes", loterias: extra.map((n) => ({ nombre: n })) }] : d.grupos;
+  cuerpo.innerHTML = `
+    <p class="nota lot-nota">Marca las loterías donde quieres que juegue este método. ⭐ = de siempre.
+      ${d.editable ? "" : "<br><b>En la página de internet no se pueden cambiar; hazlo en tu computadora.</b>"}</p>
+    <input type="search" class="lot-buscar" placeholder="Buscar lotería…">
+    <div class="lot-atajos">
+      <button data-a="todas">Marcar todas</button><button data-a="ninguna">Ninguna</button>
+      <button data-a="defecto">Las de siempre</button>
+      <span class="lot-cuenta"></span>
+    </div>
+    <div class="lot-lista">${grupos.map((g) => `<div class="lot-grupo" data-grupo="${esc(g.grupo)}">
+      <h4><label><input type="checkbox" class="lot-todo-grupo"> ${esc(g.grupo)}</label></h4>
+      ${g.loterias.map((l) => `<label class="lot-item${defecto.has(l.nombre) ? " de-siempre" : ""}" data-nombre="${esc(l.nombre.toLowerCase())}">
+        <input type="checkbox" value="${esc(l.nombre)}" ${elegidas.has(l.nombre) ? "checked" : ""}>
+        <span>${esc(l.nombre)}${defecto.has(l.nombre) ? " ⭐" : ""}</span></label>`).join("")}
+    </div>`).join("")}</div>
+    <div class="wa-botones lot-pie">
+      <button class="btn-wa lot-guardar" ${d.editable ? "" : "disabled"}>Guardar</button>
+      <button class="lot-restablecer" ${d.editable ? "" : "disabled"}>Restablecer</button>
+    </div>
+    <p class="nota lot-msg"></p>`;
+  const casillas = () => [...cuerpo.querySelectorAll(".lot-item input")];
+  const contar = () => {
+    cuerpo.querySelector(".lot-cuenta").textContent = `${casillas().filter((c) => c.checked).length} elegidas`;
+    for (const g of cuerpo.querySelectorAll(".lot-grupo")) {
+      const cs = [...g.querySelectorAll(".lot-item input")];
+      const n = cs.filter((c) => c.checked).length;
+      const t = g.querySelector(".lot-todo-grupo");
+      t.checked = n === cs.length; t.indeterminate = n > 0 && n < cs.length;
+    }
+  };
+  cuerpo.addEventListener("change", (e) => {
+    if (e.target.classList.contains("lot-todo-grupo"))
+      e.target.closest(".lot-grupo").querySelectorAll(".lot-item input").forEach((c) => { c.checked = e.target.checked; });
+    contar();
+  });
+  cuerpo.querySelectorAll(".lot-atajos button").forEach((b) => b.onclick = () => {
+    for (const c of casillas()) c.checked = b.dataset.a === "todas" || (b.dataset.a === "defecto" && defecto.has(c.value));
+    contar();
+  });
+  cuerpo.querySelector(".lot-buscar").oninput = (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    for (const it of cuerpo.querySelectorAll(".lot-item")) it.style.display = !q || it.dataset.nombre.includes(q) ? "" : "none";
+    for (const g of cuerpo.querySelectorAll(".lot-grupo"))
+      g.style.display = [...g.querySelectorAll(".lot-item")].some((it) => it.style.display !== "none") ? "" : "none";
+  };
+  const enviar = async (datos) => {
+    const msg = cuerpo.querySelector(".lot-msg");
+    try {
+      await api("/api/selecciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+      cerrar();
+      mostrar();
+    } catch (e) { msg.textContent = e.message; msg.classList.add("error"); }
+  };
+  cuerpo.querySelector(".lot-guardar").onclick = () => {
+    const nombres = casillas().filter((c) => c.checked).map((c) => c.value);
+    if (!nombres.length) { cuerpo.querySelector(".lot-msg").textContent = "Escoge al menos una lotería."; return; }
+    enviar({ metodo: vista, loterias: nombres });
+  };
+  cuerpo.querySelector(".lot-restablecer").onclick = () => enviar({ metodo: vista, restablecer: true });
+  contar();
 }
 
 function cargarImagen(src) {
