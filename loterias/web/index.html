@@ -718,7 +718,7 @@ async function mostrar() {
   for (const v of ["oraculo", "indicadas", "fuertes", "master", "king", "raya", "josefina", "vip", "laboratorio", "formula", "dia", "loteria"])
     $(`#tab-${v}`).classList.toggle("activo", v === vista);
   try {
-    if (!resumen) await cargarResumen();
+    if (!resumen) { await recordarLoterias(); await cargarResumen(); }
     if (!resumen.total) { $("#vista").innerHTML = sinDatos(); return; }
     if (vista === "loteria") await vistaLoteria(param);
     else if (vista === "indicadas") await vistaIndicadas(param);
@@ -736,6 +736,27 @@ async function mostrar() {
   } catch (e) {
     aviso(`No se pudieron cargar los datos: ${e.message}. ¿Está corriendo "python main.py web"?`, true);
   }
+}
+
+// Lo elegido en 🎰 Loterías se guarda en este navegador y se le vuelve a mandar al servidor al
+// abrir la página, así no se pierde aunque el servidor se reinicie
+const MEMORIA_LOTERIAS = "loterias-elegidas";
+function leerMemoria() {
+  try { return JSON.parse(localStorage.getItem(MEMORIA_LOTERIAS) || "{}"); } catch { return {}; }
+}
+function anotarMemoria(metodo, nombres) {
+  try {
+    const m = leerMemoria();
+    m[metodo] = nombres;  // null = las de siempre
+    localStorage.setItem(MEMORIA_LOTERIAS, JSON.stringify(m));
+  } catch { /* sin almacenamiento: queda solo en el servidor */ }
+}
+async function recordarLoterias() {
+  const todas = leerMemoria();
+  if (!Object.keys(todas).length) return;
+  try {
+    await api("/api/selecciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ todas }) });
+  } catch { /* si falla, se sigue con lo que tenga el servidor */ }
 }
 
 async function cargarResumen() {
@@ -1767,8 +1788,8 @@ async function abrirLoterias(vista) {
     const headers = { "Content-Type": "application/json" };
     msg.classList.remove("error"); msg.textContent = "Guardando…";
     try {
-      const r = await api("/api/selecciones", { method: "POST", headers, body: JSON.stringify(datos) });
-      if (r.aviso) alert(r.aviso);
+      await api("/api/selecciones", { method: "POST", headers, body: JSON.stringify(datos) });
+      anotarMemoria(datos.metodo, datos.restablecer ? null : datos.loterias);
       cerrar();
       mostrar();
     } catch (e) {

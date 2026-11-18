@@ -1710,6 +1710,22 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                 try:
                     largo = int(self.headers.get("Content-Length", 0))
                     datos = json.loads(self.rfile.read(largo) or b"{}")
+                    # el navegador recuerda lo elegido y lo vuelve a mandar al abrir la página
+                    # (la nube olvida al reiniciarse): solo se aplica lo que cambió
+                    if "todas" in datos:
+                        cambios = 0
+                        with _seleccion_lock:
+                            for m, ns in dict(datos["todas"]).items():
+                                if (m not in _LISTAS and m not in _LIBRES) or (ns is not None and not ns):
+                                    continue
+                                ns = None if ns is None else [str(n) for n in ns]
+                                por_defecto = None if m in _LIBRES else [n for _, n in _POR_DEFECTO[m]]
+                                if (por_defecto if ns is None else ns) != seleccion(m):
+                                    aplicar_seleccion(m, ns)
+                                    cambios += 1
+                            if cambios:
+                                guardar_selecciones()
+                        return self._json({"ok": True, "cambios": cambios})
                     metodo = datos["metodo"]
                     nombres = None if datos.get("restablecer") else [str(n) for n in datos["loterias"]]
                     if nombres is not None and not nombres:
@@ -1719,8 +1735,10 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                         guardar_selecciones()
                 except (KeyError, ValueError, TypeError) as e:
                     return self._json({"error": f"Datos no válidos: {e}"}, 400)
-                aviso = subir_selecciones_github() if publico else None
-                return self._json({"ok": True, "elegidas": seleccion(metodo), "aviso": aviso})
+                # en la nube se intenta guardar en GitHub; si no hay token, el navegador lo recuerda igual
+                if publico and os.environ.get("GITHUB_TOKEN"):
+                    subir_selecciones_github()
+                return self._json({"ok": True, "elegidas": seleccion(metodo)})
             if urlparse(self.path).path != "/api/actualizar":
                 return self._json({"error": "No encontrado"}, 404)
             if publico:  # en la nube se actualiza sola; nadie de fuera dispara descargas
