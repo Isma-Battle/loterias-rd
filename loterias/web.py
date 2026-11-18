@@ -38,7 +38,11 @@ y pide los datos a estas rutas (todas devuelven JSON):
 
 from __future__ import annotations
 
+import base64
+import hmac
 import json
+import os
+import urllib.request
 import math
 import sys
 import threading
@@ -1492,6 +1496,45 @@ def guardar_selecciones(ruta: Path = RUTA_SELECCIONES):
     ruta.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+# En la nube (Render) se puede cambiar con una clave (variable de entorno CLAVE_ADMIN). Como Render
+# borra los archivos en cada despliegue, lo elegido se sube a GitHub (GITHUB_TOKEN) para que quede.
+REPO_GITHUB = os.environ.get("GITHUB_REPO", "Isma-Battle/loterias-rd")
+RAMA_GITHUB = os.environ.get("GITHUB_RAMA", "main")
+
+
+def clave_correcta(clave: str | None) -> bool:
+    esperada = os.environ.get("CLAVE_ADMIN", "")
+    return bool(esperada) and hmac.compare_digest((clave or "").encode(), esperada.encode())
+
+
+def subir_selecciones_github(ruta: Path = RUTA_SELECCIONES) -> str | None:
+    """Sube datos/selecciones.json al repositorio. Devuelve un error, o None si salió bien."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        return "Falta GITHUB_TOKEN: el cambio vale hasta el próximo despliegue"
+    url = f"https://api.github.com/repos/{REPO_GITHUB}/contents/datos/selecciones.json"
+    cab = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+           "User-Agent": "loterias-rd", "X-GitHub-Api-Version": "2022-11-28"}
+    try:
+        sha = None
+        try:
+            with urllib.request.urlopen(urllib.request.Request(f"{url}?ref={RAMA_GITHUB}", headers=cab), timeout=20) as r:
+                sha = json.load(r).get("sha")
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+        cuerpo = {"message": "Loterías elegidas (desde la página)", "branch": RAMA_GITHUB,
+                  "content": base64.b64encode(ruta.read_bytes()).decode()}
+        if sha:
+            cuerpo["sha"] = sha
+        pedido = urllib.request.Request(url, data=json.dumps(cuerpo).encode(), method="PUT",
+                                        headers={**cab, "Content-Type": "application/json"})
+        with urllib.request.urlopen(pedido, timeout=20):
+            return None
+    except Exception as e:  # noqa: BLE001 - se informa en la página
+        return f"No se pudo guardar en GitHub ({e}); vale hasta el próximo despliegue"
+
+
 def loterias_disponibles(con, metodo: str) -> dict:
     """Las loterías que se pueden escoger para un método, agrupadas, y cuáles están elegidas."""
     filas = con.execute("SELECT loteria, grupo, numeros, fecha FROM sorteos s WHERE fecha = "
@@ -1622,7 +1665,10 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     metodo = q.get("metodo", "")
                     if metodo not in _LISTAS and metodo not in _LIBRES:
                         return self._json({"error": "Método desconocido"}, 404)
-                    return self._json({**loterias_disponibles(con, metodo), "editable": not publico})
+                    # en la nube se puede editar con la clave (si CLAVE_ADMIN está configurada)
+                    return self._json({**loterias_disponibles(con, metodo),
+                                       "editable": not publico or bool(os.environ.get("CLAVE_ADMIN")),
+                                       "pide_clave": publico})
                 if url.path == "/api/compartir":
                     try:
                         fecha = date.fromisoformat(q.get("fecha", ""))
@@ -1670,8 +1716,10 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
 
         def do_POST(self):
             if urlparse(self.path).path == "/api/selecciones":
-                if publico:
-                    return self._json({"error": "En la nube no se pueden cambiar las loterías"}, 403)
+                if publico and not os.environ.get("CLAVE_ADMIN"):
+                    return self._json({"error": "En la nube falta configurar CLAVE_ADMIN"}, 403)
+                if publico and not clave_correcta(self.headers.get("X-Clave")):
+                    return self._json({"error": "Clave incorrecta", "clave": True}, 401)
                 try:
                     largo = int(self.headers.get("Content-Length", 0))
                     datos = json.loads(self.rfile.read(largo) or b"{}")
@@ -1684,7 +1732,8 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                         guardar_selecciones()
                 except (KeyError, ValueError, TypeError) as e:
                     return self._json({"error": f"Datos no válidos: {e}"}, 400)
-                return self._json({"ok": True, "elegidas": seleccion(metodo)})
+                aviso = subir_selecciones_github() if publico else None
+                return self._json({"ok": True, "elegidas": seleccion(metodo), "aviso": aviso})
             if urlparse(self.path).path != "/api/actualizar":
                 return self._json({"error": "No encontrado"}, 404)
             if publico:  # en la nube se actualiza sola; nadie de fuera dispara descargas

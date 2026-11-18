@@ -10,3 +10,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.7"
+      # Para cambiar las loterías desde la página de internet (se ponen a mano en Render → Environment)
+      - key: CLAVE_ADMIN
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
