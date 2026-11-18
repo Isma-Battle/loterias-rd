@@ -39,7 +39,6 @@ y pide los datos a estas rutas (todas devuelven JSON):
 from __future__ import annotations
 
 import base64
-import hmac
 import json
 import os
 import urllib.request
@@ -1496,15 +1495,10 @@ def guardar_selecciones(ruta: Path = RUTA_SELECCIONES):
     ruta.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-# En la nube (Render) se puede cambiar con una clave (variable de entorno CLAVE_ADMIN). Como Render
-# borra los archivos en cada despliegue, lo elegido se sube a GitHub (GITHUB_TOKEN) para que quede.
+# En la nube (Render) también se puede cambiar. Como Render borra los archivos en cada despliegue,
+# lo elegido se sube a GitHub (si está la variable GITHUB_TOKEN) para que quede.
 REPO_GITHUB = os.environ.get("GITHUB_REPO", "Isma-Battle/loterias-rd")
 RAMA_GITHUB = os.environ.get("GITHUB_RAMA", "main")
-
-
-def clave_correcta(clave: str | None) -> bool:
-    esperada = os.environ.get("CLAVE_ADMIN", "")
-    return bool(esperada) and hmac.compare_digest((clave or "").encode(), esperada.encode())
 
 
 def subir_selecciones_github(ruta: Path = RUTA_SELECCIONES) -> str | None:
@@ -1665,10 +1659,7 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     metodo = q.get("metodo", "")
                     if metodo not in _LISTAS and metodo not in _LIBRES:
                         return self._json({"error": "Método desconocido"}, 404)
-                    # en la nube se puede editar con la clave (si CLAVE_ADMIN está configurada)
-                    return self._json({**loterias_disponibles(con, metodo),
-                                       "editable": not publico or bool(os.environ.get("CLAVE_ADMIN")),
-                                       "pide_clave": publico})
+                    return self._json({**loterias_disponibles(con, metodo), "editable": True})
                 if url.path == "/api/compartir":
                     try:
                         fecha = date.fromisoformat(q.get("fecha", ""))
@@ -1716,10 +1707,6 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
 
         def do_POST(self):
             if urlparse(self.path).path == "/api/selecciones":
-                if publico and not os.environ.get("CLAVE_ADMIN"):
-                    return self._json({"error": "En la nube falta configurar CLAVE_ADMIN"}, 403)
-                if publico and not clave_correcta(self.headers.get("X-Clave")):
-                    return self._json({"error": "Clave incorrecta", "clave": True}, 401)
                 try:
                     largo = int(self.headers.get("Content-Length", 0))
                     datos = json.loads(self.rfile.read(largo) or b"{}")

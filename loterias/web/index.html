@@ -1719,8 +1719,7 @@ async function abrirLoterias(vista) {
   const grupos = extra.length ? [...d.grupos, { grupo: "Sin datos recientes", loterias: extra.map((n) => ({ nombre: n })) }] : d.grupos;
   cuerpo.innerHTML = `
     <p class="nota lot-nota">Marca las loterías donde quieres que juegue este método. ⭐ = de siempre.
-      ${d.editable ? "" : "<br><b>En la página de internet falta configurar la clave (CLAVE_ADMIN en Render).</b>"}</p>
-    ${d.pide_clave && d.editable ? `<input type="password" class="lot-clave lot-buscar" placeholder="Clave para guardar" autocomplete="current-password">` : ""}
+</p>
     <input type="search" class="lot-buscar" placeholder="Buscar lotería…">
     <div class="lot-atajos">
       <button data-a="todas">Marcar todas</button><button data-a="ninguna">Ninguna</button>
@@ -1763,26 +1762,17 @@ async function abrirLoterias(vista) {
     for (const g of cuerpo.querySelectorAll(".lot-grupo"))
       g.style.display = [...g.querySelectorAll(".lot-item")].some((it) => it.style.display !== "none") ? "" : "none";
   };
-  // la clave se recuerda en este navegador para no escribirla cada vez
-  const campoClave = cuerpo.querySelector(".lot-clave");
-  if (campoClave) { try { campoClave.value = localStorage.getItem("clave-loterias") || ""; } catch { /* sin almacenamiento */ } }
   const enviar = async (datos) => {
     const msg = cuerpo.querySelector(".lot-msg");
     const headers = { "Content-Type": "application/json" };
-    if (campoClave) {
-      if (!campoClave.value) { msg.textContent = "Escribe la clave."; msg.classList.add("error"); return; }
-      headers["X-Clave"] = campoClave.value;
-    }
     msg.classList.remove("error"); msg.textContent = "Guardando…";
     try {
       const r = await api("/api/selecciones", { method: "POST", headers, body: JSON.stringify(datos) });
-      if (campoClave) { try { localStorage.setItem("clave-loterias", campoClave.value); } catch { /* sin almacenamiento */ } }
       if (r.aviso) alert(r.aviso);
       cerrar();
       mostrar();
     } catch (e) {
       msg.textContent = e.message; msg.classList.add("error");
-      if (campoClave && /clave/i.test(e.message)) { try { localStorage.removeItem("clave-loterias"); } catch { /* */ } }
     }
   };
   cuerpo.querySelector(".lot-guardar").onclick = () => {

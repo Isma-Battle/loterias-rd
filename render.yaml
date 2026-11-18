@@ -10,8 +10,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.7"
-      # Para cambiar las loterías desde la página de internet (se ponen a mano en Render → Environment)
-      - key: CLAVE_ADMIN
-        sync: false
+      # Para que las loterías cambiadas desde la página no se borren (se pone a mano en Render → Environment)
       - key: GITHUB_TOKEN
         sync: false
