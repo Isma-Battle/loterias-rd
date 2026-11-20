@@ -1479,19 +1479,34 @@ def aplicar_seleccion(metodo: str, nombres: list[str] | None):
     _vaciar_caches()
 
 
+# Cuándo se cambiaron las loterías por última vez (hora del servidor). Con varios dispositivos,
+# gana siempre el cambio más nuevo.
+_actualizado: dict[str, str] = {"v": ""}
+
+
 def cargar_selecciones(ruta: Path = RUTA_SELECCIONES):
     try:
         datos = json.loads(ruta.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return
+    _actualizado["v"] = str(datos.pop("_actualizado", ""))
     for metodo, nombres in datos.items():
         if metodo in _LISTAS or metodo in _LIBRES:
             aplicar_seleccion(metodo, nombres)
 
 
-def guardar_selecciones(ruta: Path = RUTA_SELECCIONES):
-    datos = {m: [n for _, n in pares] for m, (pares, _) in _LISTAS.items() if pares != _POR_DEFECTO[m]}
-    datos.update({m: v for m, v in _LIBRES.items() if v is not None})
+def estado_selecciones() -> dict:
+    """Lo elegido en cada método (None = las de siempre) y cuándo se cambió."""
+    todas = {m: (None if pares == _POR_DEFECTO[m] else [n for _, n in pares]) for m, (pares, _) in _LISTAS.items()}
+    todas.update(_LIBRES)
+    return {"actualizado": _actualizado["v"], "todas": todas}
+
+
+def guardar_selecciones(ruta: Path = RUTA_SELECCIONES, actualizado: str | None = None):
+    if actualizado is not None:
+        _actualizado["v"] = actualizado
+    datos = {m: v for m, v in estado_selecciones()["todas"].items() if v is not None}
+    datos["_actualizado"] = _actualizado["v"]
     ruta.write_text(json.dumps(datos, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
@@ -1659,7 +1674,9 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                     metodo = q.get("metodo", "")
                     if metodo not in _LISTAS and metodo not in _LIBRES:
                         return self._json({"error": "Método desconocido"}, 404)
-                    return self._json({**loterias_disponibles(con, metodo), "editable": True})
+                    # "permanente": en la nube, solo si puede guardar en GitHub (si no, se olvida al reiniciar)
+                    return self._json({**loterias_disponibles(con, metodo), "editable": True,
+                                       "permanente": not publico or bool(os.environ.get("GITHUB_TOKEN"))})
                 if url.path == "/api/compartir":
                     try:
                         fecha = date.fromisoformat(q.get("fecha", ""))
@@ -1710,35 +1727,43 @@ def crear_servidor(ruta_db: Path, puerto: int, host: str = "127.0.0.1",
                 try:
                     largo = int(self.headers.get("Content-Length", 0))
                     datos = json.loads(self.rfile.read(largo) or b"{}")
-                    # el navegador recuerda lo elegido y lo vuelve a mandar al abrir la página
-                    # (la nube olvida al reiniciarse): solo se aplica lo que cambió
+                    # Al abrir la página, el navegador manda lo que recuerda con la hora en que se
+                    # cambió. Solo se aplica si es más nuevo que lo del servidor (la nube olvida al
+                    # reiniciarse); si el servidor tiene algo más nuevo (de otro dispositivo), gana el servidor.
                     if "todas" in datos:
                         cambios = 0
+                        ts = str(datos.get("actualizado") or "")
                         with _seleccion_lock:
-                            for m, ns in dict(datos["todas"]).items():
-                                if (m not in _LISTAS and m not in _LIBRES) or (ns is not None and not ns):
-                                    continue
-                                ns = None if ns is None else [str(n) for n in ns]
-                                por_defecto = None if m in _LIBRES else [n for _, n in _POR_DEFECTO[m]]
-                                if (por_defecto if ns is None else ns) != seleccion(m):
-                                    aplicar_seleccion(m, ns)
-                                    cambios += 1
-                            if cambios:
-                                guardar_selecciones()
-                        return self._json({"ok": True, "cambios": cambios})
+                            if ts > _actualizado["v"]:
+                                for m, ns in dict(datos["todas"]).items():
+                                    if (m not in _LISTAS and m not in _LIBRES) or (ns is not None and not ns):
+                                        continue
+                                    ns = None if ns is None else [str(n) for n in ns]
+                                    por_defecto = None if m in _LIBRES else [n for _, n in _POR_DEFECTO[m]]
+                                    if (por_defecto if ns is None else ns) != seleccion(m):
+                                        aplicar_seleccion(m, ns)
+                                        cambios += 1
+                                guardar_selecciones(actualizado=ts)
+                            estado = estado_selecciones()
+                        if cambios and publico and os.environ.get("GITHUB_TOKEN"):
+                            subir_selecciones_github()
+                        return self._json({"ok": True, "cambios": cambios, **estado})
                     metodo = datos["metodo"]
                     nombres = None if datos.get("restablecer") else [str(n) for n in datos["loterias"]]
                     if nombres is not None and not nombres:
                         return self._json({"error": "Escoge al menos una lotería"}, 400)
                     with _seleccion_lock:
                         aplicar_seleccion(metodo, nombres)
-                        guardar_selecciones()
+                        # la hora la pone el servidor, así todos los dispositivos usan el mismo reloj
+                        guardar_selecciones(actualizado=datetime.now(recolector.ZONA_RD).isoformat(timespec="seconds"))
+                        estado = estado_selecciones()
                 except (KeyError, ValueError, TypeError) as e:
                     return self._json({"error": f"Datos no válidos: {e}"}, 400)
                 # en la nube se intenta guardar en GitHub; si no hay token, el navegador lo recuerda igual
-                if publico and os.environ.get("GITHUB_TOKEN"):
-                    subir_selecciones_github()
-                return self._json({"ok": True, "elegidas": seleccion(metodo)})
+                aviso = None
+                if publico:
+                    aviso = subir_selecciones_github() if os.environ.get("GITHUB_TOKEN") else "falta GITHUB_TOKEN"
+                return self._json({"ok": True, "elegidas": seleccion(metodo), "aviso": aviso, **estado})
             if urlparse(self.path).path != "/api/actualizar":
                 return self._json({"error": "No encontrado"}, 404)
             if publico:  # en la nube se actualiza sola; nadie de fuera dispara descargas

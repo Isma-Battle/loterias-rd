@@ -744,18 +744,20 @@ const MEMORIA_LOTERIAS = "loterias-elegidas";
 function leerMemoria() {
   try { return JSON.parse(localStorage.getItem(MEMORIA_LOTERIAS) || "{}"); } catch { return {}; }
 }
-function anotarMemoria(metodo, nombres) {
+// La memoria es {actualizado, todas}: lo último que se supo del servidor y a qué hora se cambió
+function anotarMemoria(estado) {
   try {
-    const m = leerMemoria();
-    m[metodo] = nombres;  // null = las de siempre
-    localStorage.setItem(MEMORIA_LOTERIAS, JSON.stringify(m));
+    if (estado && estado.actualizado) localStorage.setItem(MEMORIA_LOTERIAS, JSON.stringify({ actualizado: estado.actualizado, todas: estado.todas }));
   } catch { /* sin almacenamiento: queda solo en el servidor */ }
 }
 async function recordarLoterias() {
-  const todas = leerMemoria();
-  if (!Object.keys(todas).length) return;
+  const m = leerMemoria();
+  if (!m.actualizado || !m.todas) return;  // memoria vieja o vacía: manda el servidor
   try {
-    await api("/api/selecciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ todas }) });
+    // el servidor aplica lo recordado solo si es más nuevo que lo suyo, y devuelve lo que vale
+    const r = await api("/api/selecciones", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ todas: m.todas, actualizado: m.actualizado }) });
+    anotarMemoria(r);
   } catch { /* si falla, se sigue con lo que tenga el servidor */ }
 }
 
@@ -1740,7 +1742,8 @@ async function abrirLoterias(vista) {
   const grupos = extra.length ? [...d.grupos, { grupo: "Sin datos recientes", loterias: extra.map((n) => ({ nombre: n })) }] : d.grupos;
   cuerpo.innerHTML = `
     <p class="nota lot-nota">Marca las loterías donde quieres que juegue este método. ⭐ = de siempre.
-</p>
+      ${d.permanente ? "Se guarda en el servidor para todos tus dispositivos."
+        : "<br><b>⚠️ Falta poner GITHUB_TOKEN en Render:</b> el cambio se ve en todos tus dispositivos, pero si el servidor se reinicia lo olvida (y vuelve cuando abras la página en un dispositivo que lo recuerde)."}</p>
     <input type="search" class="lot-buscar" placeholder="Buscar lotería…">
     <div class="lot-atajos">
       <button data-a="todas">Marcar todas</button><button data-a="ninguna">Ninguna</button>
@@ -1788,8 +1791,9 @@ async function abrirLoterias(vista) {
     const headers = { "Content-Type": "application/json" };
     msg.classList.remove("error"); msg.textContent = "Guardando…";
     try {
-      await api("/api/selecciones", { method: "POST", headers, body: JSON.stringify(datos) });
-      anotarMemoria(datos.metodo, datos.restablecer ? null : datos.loterias);
+      const r = await api("/api/selecciones", { method: "POST", headers, body: JSON.stringify(datos) });
+      anotarMemoria(r);
+      if (r.aviso && r.aviso !== "falta GITHUB_TOKEN") alert(r.aviso);
       cerrar();
       mostrar();
     } catch (e) {
