@@ -1,69 +1,4 @@
 {
-  "indicadas": [
-    "La Primera Día",
-    "Primera Noche",
-    "La Suerte 12:30",
-    "La Suerte 18:00",
-    "Quiniela Real",
-    "New York Tarde",
-    "New York Noche",
-    "Quiniela Leidsa",
-    "Lotería Nacional",
-    "Gana Más",
-    "Lotería Real Noche"
-  ],
-  "fuertes": [
-    "La Primera Día",
-    "Primera Noche",
-    "La Suerte 12:30",
-    "La Suerte 18:00",
-    "Quiniela Real",
-    "New York Tarde",
-    "New York Noche",
-    "Quiniela Leidsa",
-    "Lotería Nacional",
-    "Gana Más",
-    "Lotería Real Noche"
-  ],
-  "king": [
-    "La Primera Día",
-    "Primera Noche",
-    "La Suerte 12:30",
-    "La Suerte 18:00",
-    "Quiniela Real",
-    "New York Tarde",
-    "New York Noche",
-    "Quiniela Leidsa",
-    "Lotería Nacional",
-    "Gana Más",
-    "Lotería Real Noche"
-  ],
-  "raya": [
-    "La Suerte 12:30",
-    "La Suerte 18:00",
-    "Quiniela Real",
-    "Quiniela Leidsa",
-    "Lotería Nacional",
-    "Gana Más",
-    "Lotería Real Noche",
-    "La Primera Día",
-    "Primera Noche",
-    "New York Noche",
-    "New York Tarde"
-  ],
-  "master": [
-    "Gana Más",
-    "Quiniela Real",
-    "Quiniela Leidsa",
-    "New York Tarde",
-    "New York Noche",
-    "La Primera Día",
-    "Primera Noche",
-    "Lotería Nacional",
-    "Lotería Real Noche",
-    "La Suerte 12:30",
-    "La Suerte 18:00"
-  ],
   "josefina": [
     "Lotería Nacional",
     "Gana Más",
@@ -74,8 +9,9 @@
     "Quiniela Leidsa",
     "Quiniela Real",
     "Lotería Real Noche",
-    "La Suerte 12:30",
-    "La Suerte 18:00"
+    "Quiniela Loteka Día",
+    "Quiniela Loteka Noche",
+    "Nueva Yol Real"
   ],
   "vip": [
     "Lotería Nacional",
@@ -89,18 +25,5 @@
     "Quiniela Real",
     "Quiniela Leidsa",
     "Lotería Real Noche"
-  ],
-  "laboratorio": [
-    "Gana Más",
-    "Lotería Nacional",
-    "Quiniela Leidsa",
-    "Lotería Real Noche",
-    "Quiniela Real",
-    "La Primera Día",
-    "Primera Noche",
-    "La Suerte 12:30",
-    "La Suerte 18:00",
-    "New York Noche",
-    "New York Tarde"
   ]
 }
