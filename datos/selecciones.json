@@ -25,5 +25,11 @@
     "Quiniela Real",
     "Quiniela Leidsa",
     "Lotería Real Noche"
+  ],
+  "laboratorio": [
+    "Lotería Nacional",
+    "Quiniela Leidsa",
+    "Primera Noche",
+    "New York Noche"
   ]
 }
