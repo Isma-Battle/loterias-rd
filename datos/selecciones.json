@@ -23,20 +23,14 @@
     "La Suerte 12:30",
     "La Suerte 18:00",
     "Quiniela Real",
+    "Quiniela Loteka Noche",
     "Quiniela Leidsa",
-    "Lotería Real Noche"
+    "Nueva Yol Real"
   ],
   "laboratorio": [
-    "Gana Más",
-    "Lotería Nacional",
     "Quiniela Leidsa",
-    "Lotería Real Noche",
-    "Nueva Yol Real",
-    "La Primera Día",
+    "Quiniela Loteka Noche",
     "Primera Noche",
-    "La Suerte 12:30",
-    "La Suerte 18:00",
-    "New York Noche",
-    "New York Tarde"
+    "New York Noche"
   ]
 }
